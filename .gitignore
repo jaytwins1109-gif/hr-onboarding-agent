@@ -1,0 +1,52 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# next
+/.next/
+/out/
+next-env.d.ts
+
+# 环境变量（禁止提交 API Key）
+.env
+.env.local
+.env*.local
+
+# misc
+.DS_Store
+*.pem
+.vercel
+*.tsbuildinfo
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 本地跑 dev 时重定向出来的日志（含请求原文，一律不提交）
+*.log
+
+# smoke / guard 运行产物（用例数、PASS 日志、批次标记）
+smoke-*.txt
+smoke-*.flag
+*.flag
+
+# 测试产物统一目录（smoke 结果落 tmp/smoke/last-run.txt）
+/tmp/
+
+# 浏览器自动化快照
+.playwright-cli/
+
+# CodeBuddy 工作区数据（项目规则与 IDE 本地数据，不进仓库）
+.codebuddy/
+
+# 长期记忆落盘（含用户偏好，不提交）
+/data
+
+# SQLite 数据库文件（含用户数据与密码哈希，一律不提交）
+# 注意：prisma/migrations/ 是源码，必须提交；这里只挡运行期库文件。
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
