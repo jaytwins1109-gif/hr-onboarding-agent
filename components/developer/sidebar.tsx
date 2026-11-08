@@ -6,7 +6,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Gauge, Terminal, Undo2 } from 'lucide-react';
+import { Gauge, LayoutDashboard, Terminal, Undo2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const NAV = [
@@ -55,13 +55,21 @@ export function DeveloperSidebar() {
 
       {/* 底部操作 */}
       <div className="space-y-1 border-t border-slate-800 px-3 py-4">
-        <a
+        {/* DEVELOPER 必有 /admin 全能力，横跳入口无需条件渲染 */}
+        <Link
+          href="/admin"
+          className="flex w-full items-center justify-start gap-2 rounded-lg px-3 py-1.5 text-sm text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-100"
+        >
+          <LayoutDashboard className="h-4 w-4" />
+          切换至管理后台
+        </Link>
+        <Link
           href="/"
           className="flex w-full items-center justify-start gap-2 rounded-lg px-3 py-1.5 text-sm text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-100"
         >
           <Undo2 className="h-4 w-4" />
           返回前台
-        </a>
+        </Link>
       </div>
     </aside>
   );

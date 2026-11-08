@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   BookOpen,
   Briefcase,
+  Gauge,
   LayoutDashboard,
   LogOut,
   MessagesSquare,
@@ -22,7 +23,7 @@ const NAV = [
   { href: '/admin/users', label: '用户管理', icon: Users },
 ] as const;
 
-export function AdminSidebar() {
+export function AdminSidebar({ canDeveloper = false }: { canDeveloper?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -70,13 +71,22 @@ export function AdminSidebar() {
 
       {/* 底部操作 */}
       <div className="space-y-1 border-t border-slate-100 px-3 py-4">
-        <a
+        {canDeveloper && (
+          <Link
+            href="/developer"
+            className="flex w-full items-center justify-start gap-2 rounded-lg px-3 py-1.5 text-sm text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+          >
+            <Gauge className="h-4 w-4" />
+            切换至开发者后台
+          </Link>
+        )}
+        <Link
           href="/"
           className="flex w-full items-center justify-start gap-2 rounded-lg px-3 py-1.5 text-sm text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
         >
           <Undo2 className="h-4 w-4" />
           返回前台
-        </a>
+        </Link>
         <Button
           variant="ghost"
           size="sm"
