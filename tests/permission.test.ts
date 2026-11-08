@@ -25,6 +25,8 @@ import {
 } from '@/lib/llm/local-workflow';
 import {
   CHITCHAT_REPLY,
+  EMO_REPLY,
+  WEATHER_REPLY,
   isSoftFallbackTrustworthy,
   matchChitchat,
   softenFallback,
@@ -166,9 +168,22 @@ describe('matchChitchat（本地闲聊分流，零网络）', () => {
     expect(matchChitchat('HI')).toBe(CHITCHAT_REPLY);
   });
 
-  it('问候后带业务内容 → 不分流（走 LLM 温和兜底链）', () => {
+  it('情绪宣泄/状态吐槽 → 本地安抚语（秒回，不走 LLM）', () => {
+    expect(matchChitchat('不想上班')).toBe(EMO_REPLY);
+    expect(matchChitchat('明天要早起报到觉得烦')).toBe(EMO_REPLY);
+    expect(matchChitchat('好紧张啊')).toBe(EMO_REPLY);
+    expect(matchChitchat('好累啊')).toBe(EMO_REPLY);
+  });
+
+  it('天气寒暄 → 本地接话', () => {
+    expect(matchChitchat('今天天气真好')).toBe(WEATHER_REPLY);
+  });
+
+  it('问候/情绪后带强业务词 → 不分流（交 LLM 按业务分支兜底）', () => {
     expect(matchChitchat('你好，社保怎么交')).toBeNull();
     expect(matchChitchat('你好呀，请问工资几号发')).toBeNull();
+    expect(matchChitchat('不想上班，公积金怎么交')).toBeNull();
+    expect(matchChitchat('好累啊，入职材料交哪些')).toBeNull();
   });
 
   it('超长文本 → 不分流', () => {
@@ -179,23 +194,40 @@ describe('matchChitchat（本地闲聊分流，零网络）', () => {
 // ── 兜底三层：LLM 温和兜底（mock fetch） ────────────────────────────────
 
 describe('softenFallback（LLM 输出必须过后置闸门）', () => {
-  it('保留"联系 HR"原意的温和表达 → 通过闸门', () => {
+  it('业务线：保留"联系 HR"引导 → 通过闸门', () => {
     expect(
-      isSoftFallbackTrustworthy('这个问题我也不太确定，为了不误导你，建议直接联系 HR 确认哦'),
+      isSoftFallbackTrustworthy(
+        '这个问题我也不太确定，为了不误导你，建议直接联系 HR 确认哦',
+        '社保缴费比例是多少？',
+      ),
     ).toBe(true);
   });
 
-  it('弄丢原意 / 超长 → 不可信', () => {
-    expect(isSoftFallbackTrustworthy('您可以这样办理社保：第一步……')).toBe(false);
-    expect(isSoftFallbackTrustworthy('好'.repeat(121))).toBe(false);
-    expect(isSoftFallbackTrustworthy('')).toBe(false);
+  it('业务线：弄丢 HR 引导（疑似编政策）/ 超长 / 空文案 → 不可信', () => {
+    expect(isSoftFallbackTrustworthy('您可以这样办理社保：第一步……', '社保怎么交')).toBe(false);
+    expect(isSoftFallbackTrustworthy('好'.repeat(201), '不想上班')).toBe(false);
+    expect(isSoftFallbackTrustworthy('', '不想上班')).toBe(false);
+  });
+
+  it('非业务线：共情安抚不提 HR → 放行（闸门不再误伤情绪回应）', () => {
+    expect(isSoftFallbackTrustworthy('抱抱，不想上班的日常太真实了，摸摸头～', '不想上班')).toBe(
+      true,
+    );
+    expect(isSoftFallbackTrustworthy('张三你好呀，以后多多关照～', '我叫张三，以后多关照')).toBe(
+      true,
+    );
+  });
+
+  it('政治/色情特征 → 无论什么线都拒收', () => {
+    expect(isSoftFallbackTrustworthy('这个要问政府文件……', '不想上班')).toBe(false);
+    expect(isSoftFallbackTrustworthy('约炮了解一下', '你好')).toBe(false);
   });
 
   it('LLM 无 Key → null（vitest 环境默认无 Key，生产失败时同样回静态话术）', async () => {
     expect(await softenFallback('社保缴费比例是多少？')).toBeNull();
   });
 
-  it('LLM 成功 → 返回温和话术（mock deepseek）', async () => {
+  it('LLM 成功（业务问题）→ 返回温和话术（mock deepseek）', async () => {
     vi.stubEnv('DEEPSEEK_API_KEY', 'test-key');
     vi.stubGlobal(
       'fetch',
@@ -208,6 +240,21 @@ describe('softenFallback（LLM 输出必须过后置闸门）', () => {
     );
     const text = await softenFallback('社保缴费比例是多少？');
     expect(text).toBe('这个问题我也不太确定，建议直接联系 HR 确认哦～');
+  });
+
+  it('LLM 成功（情绪）→ 共情回应直达（mock deepseek，无需提 HR）', async () => {
+    vi.stubEnv('DEEPSEEK_API_KEY', 'test-key');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: '哈哈不想上班的心情太懂了，抱抱你～' } }],
+        }),
+      })),
+    );
+    const text = await softenFallback('不想上班');
+    expect(text).toBe('哈哈不想上班的心情太懂了，抱抱你～');
   });
 });
 

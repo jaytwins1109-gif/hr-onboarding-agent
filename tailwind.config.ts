@@ -9,20 +9,15 @@ export default {
   theme: {
     extend: {
       /**
-       * 色板走 CSS 变量，换皮肤只改变量值，不用动任何 className。
-       * 变量存的是 RGB 通道（"255 248 240"）而不是完整颜色——
-       * 这样 bg-cx-700/30 这类带透明度的写法才能继续生效。
+       * 色板走 CSS 变量（见 globals.css 的 :root 块）。
+       * 变量存的是 RGB 通道（"51 65 85"）而不是完整颜色——
+       * 这样 bg-cx-300/50 这类带透明度的写法才能继续生效。
+       * 换肤入口已移除（2026-11-08），只保留实际有消费者的 300/400 两档。
        */
       colors: {
         cx: {
-          50: 'rgb(var(--cx-50) / <alpha-value>)', // 页面底色
-          100: 'rgb(var(--cx-100) / <alpha-value>)', // 分隔线 / 浅填充
-          200: 'rgb(var(--cx-200) / <alpha-value>)', // 边框
-          300: 'rgb(var(--cx-300) / <alpha-value>)', // 主色
+          300: 'rgb(var(--cx-300) / <alpha-value>)', // 主色（用户气泡 / 主按钮）
           400: 'rgb(var(--cx-400) / <alpha-value>)', // 主色 hover
-          500: 'rgb(var(--cx-500) / <alpha-value>)', // 强调 / 价格
-          600: 'rgb(var(--cx-600) / <alpha-value>)', // 标题
-          700: 'rgb(var(--cx-700) / <alpha-value>)', // 正文
         },
       },
       borderRadius: {

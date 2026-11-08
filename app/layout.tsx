@@ -16,17 +16,6 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
-      <head>
-        {/*
-          在样式生效前就把皮肤落上去，不然深色皮肤会先闪一帧浅色再变暗。
-          要跟 page.tsx 里的 THEME_KEY / THEMES 保持一致。
-        */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('cx_theme_v1');if(t)document.documentElement.dataset.theme=t;}catch(e){}`,
-          }}
-        />
-      </head>
       <body className="bg-slate-50 text-slate-800 antialiased">{children}</body>
     </html>
   );

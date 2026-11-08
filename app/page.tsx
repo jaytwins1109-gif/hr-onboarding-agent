@@ -7,9 +7,7 @@ import { Bubble } from './_components/bubble';
 import { HeroCard, SkeletonBubble } from './_components/hero-card';
 import { Mascot } from './_components/mascot';
 import { NavBtn } from './_components/nav-btn';
-import { applyTheme, readTheme } from './_components/theme';
 import { useAuth } from './_components/use-auth';
-import { ThemeSwitch } from './_components/theme-switch';
 import { useDebouncedWrite } from './_components/use-debounced-write';
 import {
   DEPRECATED_KEYS,
@@ -18,7 +16,6 @@ import {
   STORE_KEY,
   WELCOME,
   WELCOME_CARDS,
-  type ThemeKey,
 } from './_components/constants';
 import type { Msg } from './_components/types';
 
@@ -31,8 +28,6 @@ export default function Page() {
   const [loading, setLoading] = useState(false);
   /** 右侧「我的」抽屉：账号与聊天记录 */
   const [myOpen, setMyOpen] = useState(false);
-  /** 当前皮肤：真身是 <html data-theme>，state 只用来画按钮 */
-  const [theme, setTheme] = useState<ThemeKey>('warm');
   /**
    * 读档完成了吗？没完成之前**不许写盘**。
    *
@@ -72,14 +67,6 @@ export default function Page() {
   const sessionId = useRef(0);
   /** 正在进行的流式请求；开新对话时用它掐断，别让旧流继续往下读 */
   const streamAbort = useRef<AbortController | null>(null);
-
-  // 进来先把皮肤贴上：layout 的内联脚本只负责首屏不闪，
-  // React 这边的 state 还得自己同步一次，按钮上的选中态才对。
-  useEffect(() => {
-    const saved = readTheme();
-    setTheme(saved);
-    document.documentElement.dataset.theme = saved;
-  }, []);
 
   // 进来先捞上次的记录。
   // 旧业务（零食助手「脆脆」）时代的残留必须在这里拦下：
@@ -453,12 +440,6 @@ export default function Page() {
   const streamingStarted = !!lastMsg?.id?.startsWith('s_') && !!lastMsg.content;
   const waitingFirst = loading && !streamingStarted;
 
-  /** 换皮肤：同步 <html data-theme>、本地缓存和按钮选中态 */
-  function changeTheme(next: ThemeKey) {
-    setTheme(next);
-    applyTheme(next);
-  }
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-100 p-4 sm:p-6">
       <div className="flex h-[90vh] w-full max-w-[1200px] gap-6">
@@ -497,8 +478,6 @@ export default function Page() {
                   👤
                 </span>
               </NavBtn>
-              {/* 换皮肤：就一个小色点，不占地方，想换的时候才点开 */}
-              <ThemeSwitch theme={theme} onChange={changeTheme} />
             </nav>
           </header>
 

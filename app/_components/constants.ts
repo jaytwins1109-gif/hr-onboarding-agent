@@ -1,10 +1,9 @@
 /**
- * 前端常量：入职快捷问题 / 场景入口 / 欢迎语 / localStorage key / 皮肤。
+ * 前端常量：入职快捷问题 / 场景入口 / 欢迎语 / localStorage key。
  *
  * 从 `app/page.tsx` 搬出来。改文案来这里，别只改一边：
  *   - `SCENES` / `QUICK` / `WELCOME_CARDS` 三处入口的文案必须**严格对应知识库种子 FAQ**
- *     （入职材料 / 入职当天流程 / 入职咨询找谁），否则用户点一下就直接吃兜底话术；
- *   - `THEME_KEY` 必须与 `app/layout.tsx` 里防闪烁的内联脚本一致。
+ *     （入职材料 / 入职当天流程 / 入职咨询找谁），否则用户点一下就直接吃兜底话术。
  */
 
 /** 聊起来后的快捷开口：三问与知识库种子 FAQ 一一对应 */
@@ -79,17 +78,3 @@ export const DEPRECATED_KEYS = ['cx_profile_v1', 'cx_want_v1', 'cx_profile_reset
 export const OLD_ERA_PATTERN = /(脆脆|跑跑|脆香)/;
 /** 用户标识：第一次进站生成一个固定住，后端据此存/取会话，不然所有人的数据会串在一个桶里 */
 export const USER_KEY = 'cx_user_v1';
-/** 皮肤偏好：跟 layout.tsx 里防闪烁的内联脚本用同一个 key，改一处必须改两处 */
-export const THEME_KEY = 'cx_theme_v1';
-
-/**
- * 皮肤清单。真正决定配色的是 globals.css 里同名的 [data-theme] 变量块，
- * 这里只管按钮上的名字和一个示意色点。
- */
-export const THEMES = [
-  { key: 'warm', label: '暖阳灰', dot: '#334155' },
-  { key: 'obsidian', label: '曜石黑', dot: '#3A332E' },
-  { key: 'glacier', label: '冰川蓝', dot: '#5AA9E6' },
-] as const;
-
-export type ThemeKey = (typeof THEMES)[number]['key'];
