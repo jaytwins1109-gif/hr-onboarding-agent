@@ -69,23 +69,29 @@ function matchFaq(message: string, items: KnowledgeItem[]) {
     const question = item.question.toLowerCase();
     const answer = item.answer.toLowerCase();
     const tags = item.tags.toLowerCase();
-    let score = 0;
 
-    for (const k of userHits) {
-      const key = k.toLowerCase();
-      if (question.includes(key)) score += 3;
-      if (tags.includes(key)) score += 2;
-      if (answer.includes(key)) score += 1;
-    }
+    const qWords = userHits.filter((k) => question.includes(k.toLowerCase()));
+    const tWords = userHits.filter((k) => tags.includes(k.toLowerCase()));
+    const aWords = userHits.filter((k) => answer.includes(k.toLowerCase()));
 
+    // 资格线（2026-11-08 批次9 收紧，宁缺毋滥）：
+    // question/tags 合计至少命中 **2 个不同**的关键词才允许出场。
+    // ① 只在 answer 里蹭到词（aWords）→ 永远无效——答案文本什么都可能写，
+    //    靠它命中等于"问离职答入职材料"；
+    // ② 只命中 1 个词 → 无效——通用词（入职/流程/新员工…）人人都挂，
+    //    删掉某条 FAQ 后，同问法会靠它误命中相邻条目而不是走兜底。
+    //    （去重后同一个词在 question 和 tags 里同时出现只算 1 个。）
+    const strong = new Set([...qWords, ...tWords]);
+    if (strong.size < 2) continue;
+
+    const score = qWords.length * 3 + tWords.length * 2 + aWords.length * 1;
     if (score > bestScore) {
       bestScore = score;
       best = item;
     }
   }
 
-  // 阈值：最高分 >= 2 且至少命中 question/tags 才认为可答；否则走兜底。
-  if (!best || bestScore < 2) return { best: null, score: bestScore };
+  if (!best) return { best: null, score: bestScore };
   return { best, score: bestScore };
 }
 

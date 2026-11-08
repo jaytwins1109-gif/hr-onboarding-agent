@@ -12,7 +12,7 @@ import { TOKEN_COOKIE, signUserToken } from '@/lib/auth/jwt';
 import { GET as statsGET } from '@/app/api/admin/stats/route';
 import { GET as messagesGET } from '@/app/api/admin/messages/route';
 import { GET as memoriesGET, DELETE as memoriesDELETE } from '@/app/api/admin/memories/route';
-import { GET as knowledgeGET } from '@/app/api/admin/knowledge/route';
+import { GET as knowledgeGET, POST as knowledgePOST } from '@/app/api/admin/knowledge/route';
 import { PUT as knowledgePUT } from '@/app/api/admin/knowledge/[id]/route';
 
 const SECRET = 'test-secret-for-vitest-0123456789';
@@ -46,6 +46,7 @@ describe('Admin API 越权矩阵', () => {
     expect((await messagesGET(req('/api/admin/messages'))).status).toBe(403);
     expect((await memoriesGET(req('/api/admin/memories'))).status).toBe(403);
     expect((await knowledgeGET(req('/api/admin/knowledge'))).status).toBe(403);
+    expect((await knowledgePOST(req('/api/admin/knowledge'))).status).toBe(403);
   });
 
   it('USER 票（登录但非管理员）→ 四个接口全 403', async () => {
@@ -55,6 +56,7 @@ describe('Admin API 越权矩阵', () => {
     expect((await messagesGET(req('/api/admin/messages', cookie))).status).toBe(403);
     expect((await memoriesGET(req('/api/admin/memories', cookie))).status).toBe(403);
     expect((await knowledgeGET(req('/api/admin/knowledge', cookie))).status).toBe(403);
+    expect((await knowledgePOST(req('/api/admin/knowledge', cookie))).status).toBe(403);
   });
 
   it('伪造票 → 403（签名校验不过）', async () => {
@@ -123,5 +125,49 @@ describe('知识库 PUT 校验层（批次8：校验必须发生在查库之前�
     });
     const res = await knowledgePUT(bad, { params: Promise.resolve({ id: 'faq_001' }) });
     expect(res.status).toBe(400);
+  });
+
+  // ── POST（批次9：新增条目）校验层，同样全部发生在查库之前 ──
+  const postReq = (body: unknown, cookieValue?: string) => {
+    const headers = new Headers();
+    if (cookieValue) headers.set('cookie', cookieValue);
+    headers.set('content-type', 'application/json');
+    return new NextRequest('http://localhost/api/admin/knowledge', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+  };
+
+  it('ADMIN POST + 缺 question → 400', async () => {
+    const res = await knowledgePOST(postReq({ answer: 'x' }, await ADMIN()));
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toContain('question');
+  });
+
+  it('ADMIN POST + 缺 answer → 400', async () => {
+    const res = await knowledgePOST(postReq({ question: 'x' }, await ADMIN()));
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toContain('answer');
+  });
+
+  it('ADMIN POST + 空白 question → 400', async () => {
+    const res = await knowledgePOST(postReq({ question: '   ', answer: 'x' }, await ADMIN()));
+    expect(res.status).toBe(400);
+  });
+
+  it('ADMIN POST + tags 非数组 → 400', async () => {
+    const res = await knowledgePOST(
+      postReq({ question: 'q', answer: 'a', tags: '入职材料' }, await ADMIN()),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('ADMIN POST + 非法 status → 400', async () => {
+    const res = await knowledgePOST(
+      postReq({ question: 'q', answer: 'a', status: 'published' }, await ADMIN()),
+    );
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toContain('active 或 draft');
   });
 });

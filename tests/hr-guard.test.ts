@@ -85,15 +85,22 @@ beforeAll(async () => {
     },
   });
   // employee 分支验证条目：scope 仍为 new_hire_public（守卫的 scope 白名单固定），
-  // 但 allowedRoles 只放 employee —— 证明 employee 分支端到端真的能通
+  // 但 allowedRoles 只放 employee —— 证明 employee 分支端到端真的能通。
+  // （批次9 收紧匹配资格线后，query 需在 question/tags 命中 2 个不同关键词，
+  //   所以问法/夹具补了「对接人」这个关键词。update 里同步写，防旧库残留行。）
   await prisma.knowledgeItem.upsert({
     where: { id: 'guard_faq_employee' },
-    update: { isDeleted: false, deletedAt: null },
+    update: {
+      isDeleted: false,
+      deletedAt: null,
+      question: '内购福利申请流程和对接人是谁？',
+      tags: JSON.stringify(['内购', '流程', '对接人']),
+    },
     create: {
       id: 'guard_faq_employee',
-      question: '内购福利申请流程是什么？',
+      question: '内购福利申请流程和对接人是谁？',
       answer: '这是 employee 专属条目：内购走内部系统申请。',
-      tags: JSON.stringify(['内购', '流程', '员工']),
+      tags: JSON.stringify(['内购', '流程', '对接人']),
       scope: 'new_hire_public',
       allowedRoles: JSON.stringify(['employee']),
       status: 'active',
@@ -168,7 +175,7 @@ describe('越权守卫', () => {
   });
   it('employee 专属条目（allowedRoles 仅 employee）employee 可召回', async () => {
     const result = await runLocalWorkflow({
-      message: '内购的申请流程是什么？',
+      message: '内购申请流程要找哪个对接人？',
       userRole: 'employee',
       outputMode: 'structured_json',
     });
@@ -177,14 +184,14 @@ describe('越权守卫', () => {
   });
   it('new_hire 访问 employee 专属条目不可召回（反向）', async () => {
     const result = await runLocalWorkflow({
-      message: '内购的申请流程是什么？',
+      message: '内购申请流程要找哪个对接人？',
       userRole: 'new_hire',
       outputMode: 'structured_json',
     });
     const json = result as Exclude<typeof result, string>;
     // 核心越权断言：employee-only 条目绝不出场。
-    // 查询词"流程"可能合法命中种子 faq_hr_onboarding_002（通用词），那是允许的——
-    // 这里只断言拿到的不是 employee 条目内容。
+    // 同问法在 new_hire 下最多命中种子条目（通用词「入职/流程」不算资格——批次9 起需
+    // question/tags 命中 2 个不同关键词），兜底或种子出场都合法，唯独 employee 条目不行。
     expect(json.matched_faq_ids).not.toContain('guard_faq_employee');
     expect(json.answer).not.toContain('内购走内部系统');
   });
