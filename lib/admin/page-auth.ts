@@ -11,7 +11,8 @@ import { ADMIN_SESSION_COOKIE, verifySessionTicket } from '@/lib/admin/session';
 export async function isAdminPageAuthed(): Promise<boolean> {
   const store = await cookies();
   const tokenTicket = await verifyUserToken(store.get(TOKEN_COOKIE)?.value);
-  if (tokenTicket?.role === 'ADMIN') return true;
+  // DEVELOPER 兼容 /admin：最高权限包含管理后台全部能力
+  if (tokenTicket?.role === 'ADMIN' || tokenTicket?.role === 'DEVELOPER') return true;
   return verifySessionTicket(
     store.get(ADMIN_SESSION_COOKIE)?.value,
     process.env.ADMIN_PASSWORD_HASH,

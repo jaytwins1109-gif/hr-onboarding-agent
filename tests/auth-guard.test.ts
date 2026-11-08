@@ -9,7 +9,7 @@ import { NextRequest } from 'next/server';
 import { SignJWT } from 'jose';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { TOKEN_COOKIE, signUserToken } from '@/lib/auth/jwt';
-import { requireAdmin } from '@/lib/auth/guard';
+import { requireAdmin, requireDeveloper } from '@/lib/auth/guard';
 
 const SECRET = 'test-secret-for-vitest-0123456789';
 // TODO(hr-assistant): 历史遗留的 JWT 签发方标识，改名会导致现有票据全部失效，暂保留。
@@ -43,6 +43,12 @@ describe('requireAdmin', () => {
     expect(result).toEqual({ userId: 'u_boss' });
   });
 
+  it('DEVELOPER 票 → 放行（开发者拥有 /admin 全部能力）', async () => {
+    const token = await signUserToken('u_dev', 'DEVELOPER');
+    const result = await requireAdmin(reqWithCookie(`${TOKEN_COOKIE}=${token}`));
+    expect(result).toEqual({ userId: 'u_dev' });
+  });
+
   it('USER 票 → 拦截（返回 null）', async () => {
     const token = await signUserToken('u_normal', 'USER');
     const result = await requireAdmin(reqWithCookie(`${TOKEN_COOKIE}=${token}`));
@@ -62,5 +68,29 @@ describe('requireAdmin', () => {
   it('伪造的 cookie 值 → 拦截（签名校验不过）', async () => {
     const result = await requireAdmin(reqWithCookie(`${TOKEN_COOKIE}=not.a.jwt`));
     expect(result).toBeNull();
+  });
+});
+
+describe('requireDeveloper', () => {
+  it('DEVELOPER 票 → 放行，返回 userId', async () => {
+    const token = await signUserToken('u_dev', 'DEVELOPER');
+    const result = await requireDeveloper(reqWithCookie(`${TOKEN_COOKIE}=${token}`));
+    expect(result).toEqual({ userId: 'u_dev' });
+  });
+
+  it('ADMIN 票 → 拦截（职责分离：ADMIN 不进 /developer）', async () => {
+    const token = await signUserToken('u_admin', 'ADMIN');
+    const result = await requireDeveloper(reqWithCookie(`${TOKEN_COOKIE}=${token}`));
+    expect(result).toBeNull();
+  });
+
+  it('USER 票 → 拦截', async () => {
+    const token = await signUserToken('u_normal', 'USER');
+    const result = await requireDeveloper(reqWithCookie(`${TOKEN_COOKIE}=${token}`));
+    expect(result).toBeNull();
+  });
+
+  it('无票 → 拦截', async () => {
+    expect(await requireDeveloper(reqWithCookie())).toBeNull();
   });
 });

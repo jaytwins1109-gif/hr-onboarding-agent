@@ -57,6 +57,7 @@ export async function GET(req: NextRequest) {
           userId: user.id,
           email: user.email,
           isGuest: user.isGuest,
+          role: user.role,
           memory: EMPTY_MEMORY,
         });
         /**
@@ -91,6 +92,7 @@ export async function GET(req: NextRequest) {
     userId: identity.userId,
     email: null,
     isGuest: true,
+    role: null,
     memory: EMPTY_MEMORY,
   });
   if (staleToken) {

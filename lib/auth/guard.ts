@@ -15,13 +15,23 @@ export interface AdminIdentity {
 }
 
 /**
- * ADMIN 放行（回 userId），其余（无票 / 游客 / USER / 旧票缺 role）一律 null。
- * 调用方统一这样用：
+ * ADMIN 及以上放行（DEVELOPER 拥有 /admin 全部能力），其余（无票 / 游客 / USER /
+ * 旧票缺 role）一律 null。调用方统一这样用：
  *   const admin = await requireAdmin(req);
  *   if (!admin) return NextResponse.json({ error: '需要管理员权限' }, { status: 403 });
  */
 export async function requireAdmin(req: NextRequest): Promise<AdminIdentity | null> {
   const ticket = await verifyUserToken(req.cookies.get(TOKEN_COOKIE)?.value);
-  if (!ticket || ticket.role !== 'ADMIN') return null;
+  if (!ticket || (ticket.role !== 'ADMIN' && ticket.role !== 'DEVELOPER')) return null;
+  return { userId: ticket.userId };
+}
+
+/**
+ * DEVELOPER 专属守卫：只放行 role === 'DEVELOPER'（ADMIN 也不行——职责分离），
+ * 供 /api/developer/* 等底层配置接口使用。回包口径与 requireAdmin 一致（null → 403）。
+ */
+export async function requireDeveloper(req: NextRequest): Promise<AdminIdentity | null> {
+  const ticket = await verifyUserToken(req.cookies.get(TOKEN_COOKIE)?.value);
+  if (!ticket || ticket.role !== 'DEVELOPER') return null;
   return { userId: ticket.userId };
 }

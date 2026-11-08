@@ -93,8 +93,10 @@ export const SYSTEM_PROMPT = `你是“小初”，公司 HR 助理，面向新�
 /**
  * 当前时间上下文（Asia/Shanghai）：注入给 LLM 的头部，让它明确知道"今天到底周几"。
  * 每次调用实时生成——长期运行的服务跨天也不会拿到昨天的日期。
+ * @param userRole 用户视角角色（new_hire/employee），仅作上下文标注；
+ *                 权限实际由服务端代码强制，不随 Prompt 变化。
  */
-export function buildTimeContext(): string {
+export function buildTimeContext(userRole: string = 'new_hire'): string {
   const nowText = new Intl.DateTimeFormat('zh-CN', {
     timeZone: 'Asia/Shanghai',
     year: 'numeric',
@@ -104,7 +106,7 @@ export function buildTimeContext(): string {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date());
-  return `【时间上下文】当前时间是：${nowText}（时区 Asia/Shanghai）。
+  return `【时间上下文】当前时间是：${nowText}（时区 Asia/Shanghai，用户视角：${userRole}）。
 用户问今天日期/星期/时间时，直接用这个信息回答，不要说不知道，也不要引导找 HR；
 不要据此推测或编造其他日期（如节假日、发薪日）的安排。`;
 }
@@ -112,8 +114,8 @@ export function buildTimeContext(): string {
 /**
  * 带实时时间注入的系统提示词——LLM 调用一律用这份，而不是裸 SYSTEM_PROMPT。
  */
-export function buildLiveSystemPrompt(): string {
-  return `${buildTimeContext()}\n\n${SYSTEM_PROMPT}`;
+export function buildLiveSystemPrompt(userRole: string = 'new_hire'): string {
+  return `${buildTimeContext(userRole)}\n\n${SYSTEM_PROMPT}`;
 }
 
 /**

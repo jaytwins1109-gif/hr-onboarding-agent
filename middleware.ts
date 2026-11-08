@@ -14,7 +14,16 @@ import { ADMIN_SESSION_COOKIE } from '@/lib/admin/session';
 
 export async function middleware(req: NextRequest): Promise<NextResponse> {
   const ticket = await verifyUserToken(req.cookies.get(TOKEN_COOKIE)?.value);
-  if (ticket?.role === 'ADMIN') return NextResponse.next();
+  const { pathname } = req.nextUrl;
+
+  // /developer 只认 DEVELOPER 登录票（ADMIN 也不进——职责分离，底层配置仅开发者可见）
+  if (pathname === '/developer' || pathname.startsWith('/developer/')) {
+    return ticket?.role === 'DEVELOPER'
+      ? NextResponse.next()
+      : NextResponse.redirect(new URL('/', req.url));
+  }
+
+  if (ticket?.role === 'ADMIN' || ticket?.role === 'DEVELOPER') return NextResponse.next();
   // V1 口令票据（cx_admin）：edge 验不了 node:crypto 的 HMAC，这里只看"有没有"，
   // 真伪与有效期由 layout / page 层 verifySessionTicket 验签——安全边界不在 middleware。
   if (req.cookies.get(ADMIN_SESSION_COOKIE)?.value) return NextResponse.next();
@@ -22,6 +31,6 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  // /admin 本身 + 所有子路径（步骤 6 的 /admin/messages 等一并覆盖）
-  matcher: ['/admin', '/admin/:path*'],
+  // /admin 本身 + 所有子路径（步骤 6 的 /admin/messages 等一并覆盖）；/developer 同理
+  matcher: ['/admin', '/admin/:path*', '/developer', '/developer/:path*'],
 };

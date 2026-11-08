@@ -57,13 +57,14 @@ async function sign(
 }
 
 /**
- * 用户角色。库里存的是文本（SQLite 无 enum），这里归一成两个合法值：
- * 票里的 role 是签发时快照，**非 'ADMIN' 一律按 USER 处理**——
- * 不信任票里的任意字符串，也不存在第三种角色。
+ * 用户角色。库里存的是文本（SQLite 无 enum），这里归一成三个合法值：
+ * 票里的 role 是签发时快照，**非白名单值一律按 USER 处理**——
+ * 不信任票里的任意字符串。DEVELOPER 是最高权限（兼容 /admin 全部能力）。
  */
-export type UserRole = 'USER' | 'ADMIN';
+export type UserRole = 'USER' | 'ADMIN' | 'DEVELOPER';
 export function normalizeRole(role?: string | null): UserRole {
-  return role === 'ADMIN' ? 'ADMIN' : 'USER';
+  if (role === 'ADMIN' || role === 'DEVELOPER') return role;
+  return 'USER';
 }
 
 async function verify(

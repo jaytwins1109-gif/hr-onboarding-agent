@@ -27,6 +27,8 @@ export interface AuthState {
   userId: string;
   email: string | null;
   isGuest: boolean;
+  /** 登录用户的角色快照：ADMIN→管理后台、DEVELOPER→开发者后台；游客/USER 为 null/USER */
+  role: 'USER' | 'ADMIN' | 'DEVELOPER' | null;
 }
 
 export interface AuthResult {
@@ -45,6 +47,7 @@ export function useAuth() {
     userId: '',
     email: null,
     isGuest: true,
+    role: null,
   });
 
   const mounted = useRef(true);
@@ -82,12 +85,19 @@ export function useAuth() {
           userId: data.userId,
           email: typeof data.email === 'string' ? data.email : null,
           isGuest: data.isGuest !== false,
+          role: data.role === 'ADMIN' || data.role === 'DEVELOPER' ? data.role : 'USER',
         });
         return;
       }
 
       // 未登录：沿用本地 id（就是升级前的那个，所以退出登录不会换人）
-      setState({ loading: false, userId: localId || state.userId, email: null, isGuest: true });
+      setState({
+        loading: false,
+        userId: localId || state.userId,
+        email: null,
+        isGuest: true,
+        role: null,
+      });
     } catch {
       if (mounted.current) {
         setState((prev) => ({
@@ -95,6 +105,7 @@ export function useAuth() {
           userId: prev.userId || localId,
           email: null,
           isGuest: true,
+          role: null,
         }));
       }
     }
@@ -175,6 +186,7 @@ export function useAuth() {
     userId,
     email: state.email,
     isGuest: state.isGuest,
+    role: state.role,
     refresh,
     login,
     upgrade,
