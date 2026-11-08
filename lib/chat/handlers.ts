@@ -8,7 +8,8 @@
 //
 // 红线：
 //   - 不输出知识库内部字段、软删除记录、越权记录；
-//   - 兜底话术严格为 FALLBACK_TEXT（“不清楚，建议联系 HR。”）。
+//   - 兜底原意"不清楚，建议联系 HR。"：chat_text 走拟人化分流（lib/llm/fallback.ts，
+//     LLM 改写也必须保留"联系 HR"引导），structured_json 仍严格 FALLBACK_JSON。
 
 import {
   FALLBACK_JSON,

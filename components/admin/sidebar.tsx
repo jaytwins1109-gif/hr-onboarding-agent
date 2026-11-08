@@ -10,6 +10,7 @@ import {
   LogOut,
   MessagesSquare,
   Undo2,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ const NAV = [
   { href: '/admin', label: '数据看板', icon: LayoutDashboard, exact: true },
   { href: '/admin/messages', label: '对话审查', icon: MessagesSquare },
   { href: '/admin/products', label: '知识库管理', icon: BookOpen },
+  { href: '/admin/users', label: '用户管理', icon: Users },
 ] as const;
 
 export function AdminSidebar() {

@@ -18,13 +18,15 @@ import { runChatTurn, runStructuredTurn } from '@/lib/chat/handlers';
 const GUARD_IDS = ['guard_faq_deleted', 'guard_faq_control', 'guard_faq_employee'];
 
 /** 守卫单元断言用的条目形状（与 KnowledgeItem 运行时字段一致） */
-function item(overrides: Partial<{
-  allowedRoles: string;
-  isDeleted: boolean;
-  deletedAt: Date | null;
-  status: string;
-  scope: string;
-}> = {}) {
+function item(
+  overrides: Partial<{
+    allowedRoles: string;
+    isDeleted: boolean;
+    deletedAt: Date | null;
+    status: string;
+    scope: string;
+  }> = {},
+) {
   return {
     allowedRoles: '["new_hire"]',
     isDeleted: false,
@@ -169,9 +171,9 @@ describe('越权守卫', () => {
   });
 
   it('employee 分支接口存在且可用：mock 一条含 employee 的条目可访问', () => {
-    expect(canAccessKnowledgeItem(item({ allowedRoles: '["new_hire","employee"]' }), 'employee')).toBe(
-      true,
-    );
+    expect(
+      canAccessKnowledgeItem(item({ allowedRoles: '["new_hire","employee"]' }), 'employee'),
+    ).toBe(true);
   });
   it('employee 专属条目（allowedRoles 仅 employee）employee 可召回', async () => {
     const result = await runLocalWorkflow({

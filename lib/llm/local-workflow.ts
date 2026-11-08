@@ -1,15 +1,22 @@
 // lib/llm/local-workflow.ts
 //
 // 2026-11-07 底层换血：旧业务打分 / 价格过滤 / 推荐 / 加购 / 库存判断全部移除。
-// 现在只有一个最小流程：知识库检索 → 权限守卫 → FAQ 关键词匹配 → 固定兜底。
+// 现在只有一个最小流程：知识库检索 → 权限守卫 → FAQ 关键词匹配 → 兜底。
+//
+// 2026-11-08 批次10：兜底拟人化 + 闲聊分流。chat_text 模式的兜底改为三级：
+//   本地闲聊引导（matchChitchat）→ LLM 温和兜底（softenFallback）→ 静态话术
+//   （FALLBACK_TEXT，LLM 无 Key/失败/输出不可信时回退）。
+//   structured_json 模式**契约不变**：未匹配/低置信严格输出 FALLBACK_JSON。
 //
 // 铁律：
-//   - 兜底话术严格为 FALLBACK_TEXT（“不清楚，建议联系 HR。”），不许换说法；
+//   - 兜底原意不变："不清楚，建议联系 HR。"——chat_text 允许 LLM 在保留原意的前提下
+//     改写语气（过 softenFallback 的后置闸门），structured_json 仍严格用原话术；
 //   - 软删除（isDeleted / deletedAt）、非 active、scope 不匹配、越权条目一律不可召回；
 //   - structured_json 输出严格 JSON 对象，不带 Markdown 代码块。
 
 import { prisma } from '@/lib/db';
 import type { KnowledgeItem } from '@prisma/client';
+import { matchChitchat, softenFallback } from './fallback';
 
 export const FALLBACK_TEXT = '不清楚，建议联系 HR。';
 
@@ -22,8 +29,22 @@ export const FALLBACK_JSON = {
 };
 
 const KEYWORDS = [
-  '材料', '身份证', '学历', '学位', '银行卡', '离职证明', 'offer', '入职',
-  '报到', '流程', '地点', '对接人', '联系', 'HR', '咨询', '新员工',
+  '材料',
+  '身份证',
+  '学历',
+  '学位',
+  '银行卡',
+  '离职证明',
+  'offer',
+  '入职',
+  '报到',
+  '流程',
+  '地点',
+  '对接人',
+  '联系',
+  'HR',
+  '咨询',
+  '新员工',
 ];
 
 function parseJsonArray(raw: string): string[] {
@@ -51,7 +72,8 @@ export function canAccessKnowledgeItem(
 
   const roles = parseJsonArray(item.allowedRoles);
 
-  // 预留 employee 接口：本期种子不含 employee，但守卫支持该角色。
+  // 批次10：ADMIN 管理员全可见（预览所有视角的条目）。
+  if (userRole === 'admin') return true;
   if (userRole === 'new_hire') return roles.includes('new_hire');
   if (userRole === 'employee') return roles.includes('employee');
   return false;
@@ -124,15 +146,20 @@ export async function runLocalWorkflow(input: LocalWorkflowInput): Promise<Local
   const { best, score } = matchFaq(input.message, visible);
 
   if (!best) {
-    if (input.outputMode === 'chat_text') return FALLBACK_TEXT;
-    return FALLBACK_JSON;
+    // structured_json 是程序消费的契约：未匹配永远严格 FALLBACK_JSON，不走拟人化。
+    if (input.outputMode === 'structured_json') return FALLBACK_JSON;
+    // chat_text：闲聊打招呼 → 本地拟人引导（零网络）；业务问题 → LLM 温和兜底
+    //（无 Key/失败/输出不可信 → 静态话术，见 lib/llm/fallback.ts 的三层设计）。
+    return matchChitchat(input.message) ?? (await softenFallback(input.message)) ?? FALLBACK_TEXT;
   }
 
   const confidence = score >= 6 ? 'high' : score >= 3 ? 'medium' : 'low';
   const needsHuman = confidence === 'low';
 
   if (input.outputMode === 'chat_text') {
-    return needsHuman ? FALLBACK_TEXT : best.answer;
+    // 低置信命中：宁缺毋滥，与未匹配同一条兜底链（闲聊分流对命中场景不适用，
+    // 这里跳过 matchChitchat——能命中 FAQ 的问法必然含业务关键词）。
+    return needsHuman ? ((await softenFallback(input.message)) ?? FALLBACK_TEXT) : best.answer;
   }
 
   return {

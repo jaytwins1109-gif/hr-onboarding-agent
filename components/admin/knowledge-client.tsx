@@ -126,7 +126,12 @@ export function KnowledgeClient() {
     setFormError('');
     setForm(
       row
-        ? { question: row.question, answer: row.answer, tags: row.tags.join(', '), status: row.status }
+        ? {
+            question: row.question,
+            answer: row.answer,
+            tags: row.tags.join(', '),
+            status: row.status,
+          }
         : EMPTY_FORM,
     );
     setModalOpen(true);
@@ -146,7 +151,14 @@ export function KnowledgeClient() {
       return;
     }
     // 逗号分隔 → 数组：兼容英文 `,` 与中文 `，`；去空白、去空项、去重
-    const tags = [...new Set(form.tags.split(/[,，]/).map((t) => t.trim()).filter(Boolean))];
+    const tags = [
+      ...new Set(
+        form.tags
+          .split(/[,，]/)
+          .map((t) => t.trim())
+          .filter(Boolean),
+      ),
+    ];
 
     setSubmitting(true);
     try {
@@ -200,14 +212,16 @@ export function KnowledgeClient() {
             />
             显示已删除
           </label>
-          <Button size="sm" variant="outline" onClick={() => void load(page, includeDeleted)} disabled={loading}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void load(page, includeDeleted)}
+            disabled={loading}
+          >
             <RefreshCcw className="h-4 w-4" />
             刷新
           </Button>
-          <Button
-            size="sm"
-            onClick={() => openModal(null)}
-          >
+          <Button size="sm" onClick={() => openModal(null)}>
             <Plus className="h-4 w-4" />
             新增条目
           </Button>
@@ -364,7 +378,9 @@ export function KnowledgeClient() {
             </label>
             <div className="grid grid-cols-[1fr_9rem] gap-3">
               <label className="grid gap-1">
-                <span className="text-xs font-medium text-slate-500">Tags（标签，中英文逗号分隔）</span>
+                <span className="text-xs font-medium text-slate-500">
+                  Tags（标签，中英文逗号分隔）
+                </span>
                 <Input
                   placeholder="如：入职材料，新员工, 报到"
                   value={form.tags}

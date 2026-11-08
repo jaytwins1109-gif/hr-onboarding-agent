@@ -23,15 +23,22 @@ datasource db {
 
 /// 用户：游客与注册用户同一张表，靠 isGuest 区分
 model User {
-  id        String   @id // u_xxx / guest_xxx，升级时不换
-  email     String?  @unique // 游客为 null
-  password  String? // bcrypt hash，游客为 null
-  isGuest   Boolean  @default(true)
+  id             String   @id // u_xxx / guest_xxx，升级时不换
+  email          String?  @unique // 游客为 null
+  password       String? // bcrypt hash，游客为 null
+  isGuest        Boolean  @default(true)
   /// "USER" | "ADMIN"（SQLite 无 enum，类型安全由 lib/auth 的 TS 联合类型守）
   /// 签发 JWT 时作为快照写进 payload；缺省 USER，旧 token 自动降级
-  role      String   @default("USER")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  role           String   @default("USER")
+  /// 知识库可见性维度的员工类型："new_hire" | "employee"（与 auth 角色正交，批次10 新增）
+  /// 不入 JWT：转正/调整要立即生效，不走 token 快照，每次请求读库
+  ///（mapKnowledgeRole，lib/auth/knowledge-role.ts）
+  employeeType   String   @default("new_hire") @map("employee_type")
+  /// 入职日期，默认建行时间。90 天窗口内的 new_hire 由 mapKnowledgeRole 自动"转正"；
+  /// Admin 可改此字段把人留在/送入新员工期
+  onboardingDate DateTime @default(now()) @map("onboarding_date")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   messages Message[]
 }

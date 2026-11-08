@@ -13,9 +13,21 @@ import { canAccessKnowledgeItem, FALLBACK_TEXT } from '@/lib/llm/local-workflow'
 import { runChatTurn, runStructuredTurn } from '@/lib/chat/handlers';
 
 const SEED_FAQS = [
-  { id: 'faq_hr_onboarding_001', question: '入职需要准备哪些材料？', tags: ['入职材料', '新员工', '报到'] },
-  { id: 'faq_hr_onboarding_002', question: '入职当天流程是什么？', tags: ['入职当天', '报到流程', '新员工'] },
-  { id: 'faq_hr_onboarding_003', question: '入职咨询应该联系谁？', tags: ['联系HR', '入职咨询', '新员工'] },
+  {
+    id: 'faq_hr_onboarding_001',
+    question: '入职需要准备哪些材料？',
+    tags: ['入职材料', '新员工', '报到'],
+  },
+  {
+    id: 'faq_hr_onboarding_002',
+    question: '入职当天流程是什么？',
+    tags: ['入职当天', '报到流程', '新员工'],
+  },
+  {
+    id: 'faq_hr_onboarding_003',
+    question: '入职咨询应该联系谁？',
+    tags: ['联系HR', '入职咨询', '新员工'],
+  },
 ];
 
 const TEST_IDS = ['faq_test_soft_deleted', 'faq_test_control'];
@@ -226,10 +238,16 @@ describe('软删除守卫', () => {
 
   it('status 非 active / scope 不匹配的条目不可访问', () => {
     expect(
-      canAccessKnowledgeItem({ ...deletedItem, isDeleted: false, deletedAt: null, status: 'draft' }, 'new_hire'),
+      canAccessKnowledgeItem(
+        { ...deletedItem, isDeleted: false, deletedAt: null, status: 'draft' },
+        'new_hire',
+      ),
     ).toBe(false);
     expect(
-      canAccessKnowledgeItem({ ...deletedItem, isDeleted: false, deletedAt: null, scope: 'employee_internal' }, 'new_hire'),
+      canAccessKnowledgeItem(
+        { ...deletedItem, isDeleted: false, deletedAt: null, scope: 'employee_internal' },
+        'new_hire',
+      ),
     ).toBe(false);
   });
 });
@@ -271,7 +289,7 @@ describe('越权守卫（employee 预留接口）', () => {
     ).toBe(true);
   });
 
-  it('未支持的角色一律拒绝', () => {
+  it('批次10 起 admin 全可见（预览所有视角）；未支持的角色仍一律拒绝', () => {
     expect(
       canAccessKnowledgeItem(
         {
@@ -282,6 +300,18 @@ describe('越权守卫（employee 预留接口）', () => {
           scope: 'new_hire_public',
         },
         'admin',
+      ),
+    ).toBe(true);
+    expect(
+      canAccessKnowledgeItem(
+        {
+          allowedRoles: '["new_hire"]',
+          isDeleted: false,
+          deletedAt: null,
+          status: 'active',
+          scope: 'new_hire_public',
+        },
+        'unregistered_role',
       ),
     ).toBe(false);
   });

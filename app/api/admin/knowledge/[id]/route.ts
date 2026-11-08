@@ -21,10 +21,7 @@ function parseJsonArray(raw: string): string[] {
   }
 }
 
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin(req);
   if (!admin) return NextResponse.json({ error: '需要管理员权限' }, { status: 403 });
 
@@ -104,7 +101,11 @@ export async function PUT(
   try {
     const row = await prisma.knowledgeItem.update({ where: { id }, data });
     return NextResponse.json({
-      item: { ...row, tags: parseJsonArray(row.tags), allowedRoles: parseJsonArray(row.allowedRoles) },
+      item: {
+        ...row,
+        tags: parseJsonArray(row.tags),
+        allowedRoles: parseJsonArray(row.allowedRoles),
+      },
     });
   } catch (err) {
     // Prisma P2025：update 的 where 没命中 → 条目不存在

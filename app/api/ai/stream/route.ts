@@ -18,6 +18,7 @@ import { handleTurn, type OutputMode } from '@/lib/chat/handlers';
 import { logMessage } from '@/lib/chat/logger';
 import { GUEST_COOKIE, GUEST_MAX_AGE, cookieString } from '@/lib/auth/jwt';
 import { resolveIdentity } from '@/lib/auth/identity';
+import { resolveKnowledgeRole } from '@/lib/auth/knowledge-role';
 import { checkRateLimit } from '@/lib/auth/rate-limit';
 import {
   newTraceId,
@@ -122,10 +123,14 @@ async function buildStreamResponse(req: NextRequest, traceId: string) {
 
         send('stage', { stage: 'memory' });
 
-        // 角色只以系统传入的上下文为准：本期所有访客默认按 new_hire 处理
+        // 角色只以系统传入的上下文为准。批次10 接通知识角色管道：游客恒 new_hire，
+        // 登录用户读库映射（employeeType 不入 JWT，转正立即生效）；ADMIN 全可见。
+        const knowledgeRole = identity.isGuest
+          ? 'new_hire'
+          : await resolveKnowledgeRole(identity.userId, identity.role);
         const turn = await handleTurn({
           message: body.message,
-          userRole: 'new_hire',
+          userRole: knowledgeRole,
           outputMode,
         });
         const replyText = typeof turn.result === 'string' ? turn.result : turn.result.answer;

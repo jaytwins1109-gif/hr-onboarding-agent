@@ -14,6 +14,8 @@ import { GET as messagesGET } from '@/app/api/admin/messages/route';
 import { GET as memoriesGET, DELETE as memoriesDELETE } from '@/app/api/admin/memories/route';
 import { GET as knowledgeGET, POST as knowledgePOST } from '@/app/api/admin/knowledge/route';
 import { PUT as knowledgePUT } from '@/app/api/admin/knowledge/[id]/route';
+import { GET as usersGET } from '@/app/api/admin/users/route';
+import { PUT as usersPUT } from '@/app/api/admin/users/[id]/route';
 
 const SECRET = 'test-secret-for-vitest-0123456789';
 
@@ -41,15 +43,23 @@ beforeAll(() => {
 });
 
 describe('Admin API 越权矩阵', () => {
-  it('无票 → 四个接口全 403', async () => {
+  it('无票 → 接口全 403', async () => {
     expect((await statsGET(req('/api/admin/stats'))).status).toBe(403);
     expect((await messagesGET(req('/api/admin/messages'))).status).toBe(403);
     expect((await memoriesGET(req('/api/admin/memories'))).status).toBe(403);
     expect((await knowledgeGET(req('/api/admin/knowledge'))).status).toBe(403);
     expect((await knowledgePOST(req('/api/admin/knowledge'))).status).toBe(403);
+    expect((await usersGET(req('/api/admin/users'))).status).toBe(403);
+    expect(
+      (
+        await usersPUT(req('/api/admin/users/u_x'), {
+          params: Promise.resolve({ id: 'u_x' }),
+        })
+      ).status,
+    ).toBe(403);
   });
 
-  it('USER 票（登录但非管理员）→ 四个接口全 403', async () => {
+  it('USER 票（登录但非管理员）→ 接口全 403', async () => {
     const token = await signUserToken('u_normal', 'USER');
     const cookie = `${TOKEN_COOKIE}=${token}`;
     expect((await statsGET(req('/api/admin/stats', cookie))).status).toBe(403);
@@ -57,6 +67,7 @@ describe('Admin API 越权矩阵', () => {
     expect((await memoriesGET(req('/api/admin/memories', cookie))).status).toBe(403);
     expect((await knowledgeGET(req('/api/admin/knowledge', cookie))).status).toBe(403);
     expect((await knowledgePOST(req('/api/admin/knowledge', cookie))).status).toBe(403);
+    expect((await usersGET(req('/api/admin/users', cookie))).status).toBe(403);
   });
 
   it('伪造票 → 403（签名校验不过）', async () => {
@@ -169,5 +180,51 @@ describe('知识库 PUT 校验层（批次8：校验必须发生在查库之前�
     );
     expect(res.status).toBe(400);
     expect(((await res.json()) as { error: string }).error).toContain('active 或 draft');
+  });
+});
+
+describe('用户管理 PUT 校验层（批次10：校验必须发生在查库之前，不连库可测）', () => {
+  const ADMIN = async () => `${TOKEN_COOKIE}=${await signUserToken('u_boss', 'ADMIN')}`;
+
+  function callUsersPUT(body: unknown, cookieValue?: string) {
+    const headers = new Headers();
+    if (cookieValue) headers.set('cookie', cookieValue);
+    headers.set('content-type', 'application/json');
+    const req = new NextRequest('http://localhost/api/admin/users/u_x', {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(body),
+    });
+    return usersPUT(req, { params: Promise.resolve({ id: 'u_x' }) });
+  }
+
+  it('ADMIN + 非法 employeeType → 400（不打 DB）', async () => {
+    const res = await callUsersPUT({ employeeType: 'boss' }, await ADMIN());
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe('INVALID_EMPLOYEE_TYPE');
+  });
+
+  it('ADMIN + 非法 onboardingDate → 400（不打 DB）', async () => {
+    const res = await callUsersPUT(
+      { employeeType: 'employee', onboardingDate: 'not-a-date' },
+      await ADMIN(),
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe('INVALID_ONBOARDING_DATE');
+  });
+
+  it('ADMIN + 非法 JSON 请求体 → 400', async () => {
+    const headers = new Headers();
+    headers.set('cookie', await ADMIN());
+    headers.set('content-type', 'application/json');
+    const bad = new NextRequest('http://localhost/api/admin/users/u_x', {
+      method: 'PUT',
+      headers,
+      body: '{oops',
+    });
+    const res = await usersPUT(bad, { params: Promise.resolve({ id: 'u_x' }) });
+    expect(res.status).toBe(400);
   });
 });

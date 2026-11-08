@@ -17,6 +17,7 @@ import { handleTurn, type OutputMode } from '@/lib/chat/handlers';
 import { logMessage } from '@/lib/chat/logger';
 import { GUEST_COOKIE, GUEST_MAX_AGE, cookieString } from '@/lib/auth/jwt';
 import { resolveIdentity } from '@/lib/auth/identity';
+import { resolveKnowledgeRole } from '@/lib/auth/knowledge-role';
 import { checkRateLimit } from '@/lib/auth/rate-limit';
 import {
   newTraceId,
@@ -92,14 +93,18 @@ export async function POST(req: NextRequest) {
       traceId,
     });
 
-    const payload = await runWithTrace(traceId, () =>
-      // 角色只以系统传入的上下文为准：本期所有访客默认按 new_hire 处理
-      //（employee 分支已在 canAccessKnowledgeItem 预留，待权限体系接入）。
-      handleTurn({ message: body.message, userRole: 'new_hire', outputMode }),
-    );
+    const payload = await runWithTrace(traceId, async () => {
+      // 角色只以系统传入的上下文为准。批次10 起接通知识角色管道：
+      //   - 游客恒 new_hire（游客无员工类型概念，最保守视角）；
+      //   - 登录用户每次请求读库映射（employeeType 不入 JWT，转正立即生效，见
+      //     lib/auth/knowledge-role.ts）；ADMIN 全可见。
+      const knowledgeRole = identity.isGuest
+        ? 'new_hire'
+        : await resolveKnowledgeRole(identity.userId, identity.role);
+      return handleTurn({ message: body.message, userRole: knowledgeRole, outputMode });
+    });
 
-    const replyText =
-      typeof payload.result === 'string' ? payload.result : payload.result.answer;
+    const replyText = typeof payload.result === 'string' ? payload.result : payload.result.answer;
 
     traceResponse(traceId, replyText, 0, {
       degraded: false,
