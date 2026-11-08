@@ -1,17 +1,14 @@
 // prisma/schema.prisma
 //
-// V2.0 数据层：把「长期记忆」从 data/memory.json 搬进 SQLite。
+// HR 助理数据层（2026-11-08 瘦身）：User / Message（对话审查） / KnowledgeItem（HR FAQ）。
+// 旧业务的 Memory（长期记忆）model 已随记忆功能下线整体删除（批次：基建净化），
+// 记忆相关代码（lib/memory/store.ts 及配套脚本）一并移除。
 //
-// 几条刻意的取舍（改之前先读，别按直觉"优化"）：
-//   1. layer / status / polarity 用 String 不用 enum —— SQLite 不支持 Prisma enum。
-//      类型安全由 lib/memory/store.ts 里的 TS 联合类型守住，库里只是文本。
-//   2. 不加 @@unique([userId, layer, keyword, status]) —— 现有语义允许同一个 keyword
-//      同时存在 active / deleted / superseded 多行（软删除要留痕）。加唯一键会在
-//      状态流转时直接冲突。去重仍由事务内的 findFirst 完成。
-//   3. category / polarity / source / createdAt 是用户清单里没写、但现有代码在用的字段，
-//      不落库就是静默丢数据。
-//   4. User.id 沿用现有的 u_xxx / guest_xxx：游客升级成正式用户时**不换 id**，
-//      记忆天然继承，不需要搬数据。
+// 取舍备忘（改之前先读，别按直觉"优化"）：
+//   1. role / status 等语义字段用 String 不用 enum —— SQLite 不支持 Prisma enum，
+//      类型安全由 lib/ 下对应的 TS 联合类型守住，库里只是文本。
+//   2. User.id 沿用 u_xxx / guest_xxx：游客升级成正式用户时**不换 id**，
+//      历史 Message 日志天然继承，不需要搬数据。
 
 generator client {
   provider = "prisma-client-js"
@@ -19,7 +16,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  // file:../data/cuixiang.db —— 相对 schema 所在目录，最终落在项目根的 data/ 下。
+  // file:../data/hr-assistant.db —— 相对 schema 所在目录，最终落在项目根的 data/ 下。
   // data/ 已被 .gitignore 排除，库文件和归档备份都在一起。
   url      = env("DATABASE_URL")
 }
@@ -36,38 +33,7 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memories Memory[]
   messages Message[]
-}
-
-/// 长期记忆：替代 data/memory.json 里的 MemoryRecord[]
-model Memory {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  /// core_profile | summary_memory | fragment_memory
-  layer   String
-  keyword String
-  content String
-  /// active | pending | resolved | superseded | deleted
-  status  String  @default("active")
-  /// 适用场景，没有则 null
-  context String?
-
-  /// 「过敏忌口」等分类，factsFromMessage / decideMemoryAction 用
-  category String?
-  /// 喜欢 | 不喜欢 | 拒绝 | 接受 | 中立 | 不确定
-  polarity String?
-  /// 「对话提取」「冲突确认」
-  source   String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // 召回按 (userId, layer, status) 过滤，写盘上限按 (userId, updatedAt) 排序
-  @@index([userId, layer, status])
-  @@index([userId, updatedAt])
 }
 
 /// 聊天日志（V3.0 Admin「对话审查」数据源）。
@@ -82,9 +48,6 @@ model Message {
   role    String
   /// 用户原话 / 模型 final 定稿文本（流式不存中间 delta）
   content String
-  /// 结构化结果数组的 JSON 文本（SQLite 无 Json scalar，读取方 JSON.parse）；
-  /// 零食业务时代的推荐卡字段，换血后对话不再产卡，新数据恒为 null。user 轮为 null
-  cards   String?
   /// 关联本轮 TraceID，Admin 审查时一键回溯
   traceId String?
 

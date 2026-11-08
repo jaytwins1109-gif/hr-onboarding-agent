@@ -10,15 +10,15 @@
 # 想手动迁库：docker compose run --rm migrate
 #
 # 关键点：./data 挂到 /app/data。SQLite 文件就在宿主机上，容器重建不丢。
-# .env 里的 DATABASE_URL 写 `file:../data/cuixiang.db`（相对 prisma/schema.prisma），
-# 在容器里正好解析到 /app/data/cuixiang.db。
+# .env 里的 DATABASE_URL 写 `file:../data/hr-assistant.db`（相对 prisma/schema.prisma），
+# 在容器里正好解析到 /app/data/hr-assistant.db。
 
 services:
   migrate:
     build:
       context: .
       target: migrator
-    image: cuixiang-migrator:latest
+    image: hr-migrator:latest
     env_file: .env
     volumes:
       - ./data:/app/data
@@ -38,7 +38,7 @@ services:
     build:
       context: .
       target: runner
-    image: cuixiang-app:latest
+    image: hr-app:latest
     depends_on:
       migrate:
         condition: service_completed_successfully

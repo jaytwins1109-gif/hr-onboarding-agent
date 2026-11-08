@@ -11,11 +11,11 @@
 ## 0. 三分钟快速开始
 
 ```bash
-git clone <你的仓库地址> cuixiang && cd cuixiang
+git clone <你的仓库地址> hr-assistant && cd hr-assistant
 
 cp .env.example .env
 #   打开 .env，至少填这三项：
-#     DATABASE_URL="file:../data/cuixiang.db"   ← 保持这个相对路径别改
+#     DATABASE_URL="file:../data/hr-assistant.db"   ← 保持这个相对路径别改
 #     AUTH_SECRET=<下面第 1 步生成>
 #     DEEPSEEK_API_KEY=<你的 Key>
 
@@ -62,13 +62,13 @@ node -e "console.log(require('crypto').createHash('sha256').update('你的口令
 
 | 变量 | 必填 | 说明 |
 |---|---|---|
-| `DATABASE_URL` | ✅ | 固定写 `file:../data/cuixiang.db`。相对 `prisma/schema.prisma`，容器内解析为 `/app/data/cuixiang.db` |
+| `DATABASE_URL` | ✅ | 固定写 `file:../data/hr-assistant.db`。相对 `prisma/schema.prisma`，容器内解析为 `/app/data/hr-assistant.db` |
 | `AUTH_SECRET` | ✅ | 见上一步，≥16 字符 |
 | `DEEPSEEK_API_KEY` / `GLM_API_KEY` | 至少一个 | 两个都没配会直接抛「没有可用的大脑」 |
 | `LLM_PROVIDER` | | `deepseek`（默认）/ `glm` |
 | `ORCHESTRATOR` | | `local`（默认，不依赖外部服务）|
 | `ADMIN_PASSWORD_HASH` | | 不填 = 后台禁用（fail-closed）|
-| `RATE_LIMIT_MAX` | ❌ | **生产不要配**，那是本地跑 smoke 用的 |
+| `RATE_LIMIT_MAX` | ❌ | **生产不要配**，那是本地回归测试临时调高用的 |
 
 ---
 
@@ -93,7 +93,7 @@ Render 的 Native Environment（不是 Docker Runtime）自带 **Pre-Deploy Comm
 | Start Command | `npm start` |
 | Environment → `NODE_VERSION` | `20` |
 | Environment → `TZ` | `Asia/Shanghai`（记忆里的"今天/昨天"按北京时间算） |
-| Environment → `DATABASE_URL` | `file:/var/data/cuixiang.db`（**绝对路径**，指向挂载盘） |
+| Environment → `DATABASE_URL` | `file:/var/data/hr-assistant.db`（**绝对路径**，指向挂载盘） |
 | Environment → `AUTH_SECRET` / `DEEPSEEK_API_KEY` 等 | 同 §2 表格 |
 | Disk | 任意大小，挂载路径 `/var/data`（SQLite 就写在这里；**免费实例没有 Disk，必须付费档**） |
 | Health Check Path | `/api/health` |
@@ -105,7 +105,7 @@ Render 的 Native Environment（不是 Docker Runtime）自带 **Pre-Deploy Comm
 这类平台对多阶段 `target` 支持不一，稳妥做法是**把迁库并进启动流程**：
 
 1. Volume：Railway 挂到 `/app/data`，Fly 挂到 `/app/data`
-2. `DATABASE_URL=file:/app/data/cuixiang.db`（**绝对路径**；相对路径依赖 schema 的编译期位置，云盘路径一变就失联）
+2. `DATABASE_URL=file:/app/data/hr-assistant.db`（**绝对路径**；相对路径依赖 schema 的编译期位置，云盘路径一变就失联）
 3. 迁库三选一：
    - 平台支持"release command / deploy 前任务"且能指定 `target: migrator` → 直接用；
    - 平台支持在启动命令前插一步 shell（如 Railway 的 start command）→ 临时换 `Dockerfile` 里加 prisma CLI 的镜像；
@@ -269,15 +269,15 @@ docker compose run --rm --entrypoint sh migrate -c "npm run db:backup -- --keep=
 
 ```bash
 docker compose stop app
-cp data/backups/cuixiang-YYYYMMDD-HHmmss.db data/cuixiang.db
-rm -f data/cuixiang.db-wal data/cuixiang.db-shm   # 旧 WAL 与新库不匹配，必须清掉
+cp data/backups/hr-assistant-YYYYMMDD-HHmmss.db data/hr-assistant.db
+rm -f data/hr-assistant.db-wal data/hr-assistant.db-shm   # 旧 WAL 与新库不匹配，必须清掉
 docker compose start app
 ```
 
 建议加个宿主机 crontab：
 
 ```cron
-0 4 * * * cd /opt/cuixiang && docker compose run --rm --entrypoint sh migrate -c "npm run db:backup -- --keep=7" >> /var/log/cuixiang-backup.log 2>&1
+0 4 * * * cd /opt/hr-assistant && docker compose run --rm --entrypoint sh migrate -c "npm run db:backup -- --keep=7" >> /var/log/hr-assistant-backup.log 2>&1
 ```
 
 ---
@@ -304,7 +304,7 @@ docker compose exec app sh                 # 进容器（非 root 用户 nextjs�
 docker compose restart app                 # 只重启业务
 docker compose down                        # 停服（数据在 ./data，不会丢）
 docker compose build --no-cache app        # 彻底重建
-du -h data/cuixiang.db                     # 库多大
+du -h data/hr-assistant.db                     # 库多大
 ```
 
 ---
@@ -344,9 +344,7 @@ migrator   完整 node_modules + prisma/              ← 只在部署时跑一�
 
 ```bash
 npm run verify        # 类型 + 单测
-npm run guard         # profile / reco 两份守卫
 npm run build         # 确认 standalone 能产出
-npm run smoke         # 端到端（需本地 dev server 在跑）
 ```
 
-四条都绿再上，别把回归留到线上做。
+两条都绿再上，别把回归留到线上做。

@@ -11,7 +11,7 @@ echo ============================================
 echo.
 
 set "STARTUP=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
-set "LNK=%STARTUP%\cuixiang-dev-server.lnk"
+set "LNK=%STARTUP%\hr-assistant-dev-server.lnk"
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('%LNK%'); $s.TargetPath = '%~dp0silent-start.vbs'; $s.WorkingDirectory = '%~dp0'; $s.Save()"
 

@@ -17,7 +17,6 @@
     "verify": "tsc --noEmit && vitest run",
     "capture-log": "node scripts/capture-log.mjs",
     "gen-password": "node scripts/gen-password.mjs",
-    "prune-memory": "node --import ./scripts/ts-alias-register.mjs scripts/prune-memory.ts",
     "promote-admin": "node --import ./scripts/ts-alias-register.mjs scripts/promote-admin.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
@@ -25,8 +24,7 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:backup": "node --import ./scripts/ts-alias-register.mjs scripts/backup-db.ts",
-    "db:seed": "node --import ./scripts/ts-alias-register.mjs prisma/seed.ts",
-    "migrate-json": "node scripts/migrate-memory-json.mjs"
+    "db:seed": "node --import ./scripts/ts-alias-register.mjs prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

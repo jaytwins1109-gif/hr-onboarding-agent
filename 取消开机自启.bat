@@ -3,7 +3,7 @@ chcp 65001 >nul
 title 小初入职咨询助理 - 取消开机自启
 cd /d "%~dp0"
 
-set "LNK=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\cuixiang-dev-server.lnk"
+set "LNK=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\hr-assistant-dev-server.lnk"
 
 if exist "%LNK%" (
   del "%LNK%"
