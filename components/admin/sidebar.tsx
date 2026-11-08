@@ -4,11 +4,11 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
+  BookOpen,
   Briefcase,
   LayoutDashboard,
   LogOut,
   MessagesSquare,
-  Package,
   Undo2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 const NAV = [
   { href: '/admin', label: '数据看板', icon: LayoutDashboard, exact: true },
   { href: '/admin/messages', label: '对话审查', icon: MessagesSquare },
-  { href: '/admin/products', label: '商品管理', icon: Package },
+  { href: '/admin/products', label: '知识库管理', icon: BookOpen },
 ] as const;
 
 export function AdminSidebar() {

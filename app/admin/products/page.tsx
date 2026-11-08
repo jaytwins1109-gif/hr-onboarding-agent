@@ -1,11 +1,12 @@
-// app/admin/products/page.tsx — 商品管理页
+// app/admin/products/page.tsx — 知识库管理页
+// 路径保留 /admin/products（侧边栏与既有入口不变），实际管理对象是知识库条目 KnowledgeItem。
 import { redirect } from 'next/navigation';
 import { isAdminPageAuthed } from '@/lib/admin/page-auth';
-import { ProductsClient } from '@/components/admin/products-client';
+import { KnowledgeClient } from '@/components/admin/knowledge-client';
 
-export const metadata = { title: '商品管理 · 小初管理后台' };
+export const metadata = { title: '知识库管理 · 小初管理后台' };
 
-export default async function AdminProductsPage() {
+export default async function AdminKnowledgePage() {
   if (!(await isAdminPageAuthed())) redirect('/');
-  return <ProductsClient />;
+  return <KnowledgeClient />;
 }
