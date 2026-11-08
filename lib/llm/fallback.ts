@@ -11,17 +11,33 @@
 //      情绪/闲聊 → 共情安抚，绝不提"联系 HR"。
 //   3. **静态兜底**（FALLBACK_TEXT）：LLM 无 Key / 失败 / 输出不可信 → 原话术。
 //
-// 后置闸门（isSoftFallbackTrustworthy）按"用户原话是否含强业务词"分流验收：
-//   业务线：回复必须保留"联系 HR"类引导特征——这是防编造的核心防线（没引导 HR 的
-//   "业务答案"大概率是编的政策）；非业务线：只要不踩政治/色情黑名单即放行。
+// 后置闸门（isSoftFallbackTrustworthy）按"用户原话意图"分流验收：
+//   词汇解释线：原话含英文词 + 公司文件语境（问 HR 材料里的生词）→ 直接解释即放行，
+//   不要求"联系 HR"（SYSTEM_PROMPT 二·六第 2 条：业务辅助必须热心解答）；
+//   业务线：原话问公司事务 → 回复必须保留"联系 HR"类引导特征——这是防编造的核心防线；
+//   非业务线：只要不踩政治/色情黑名单即放行。
 // structured_json 模式不经过本文件：那是程序消费的契约，永远严格 FALLBACK_JSON。
 
 import { callLlm } from './client';
-import { SYSTEM_PROMPT } from '@/lib/prompts/system-prompt';
+import { buildLiveSystemPrompt } from '@/lib/prompts/system-prompt';
 
 /** 纯闲聊句式：整句只是问候/感谢/告别/问身份，允许结尾带标点。防"你好，社保怎么交"误分流 */
 const CHITCHAT_RE =
   /^(你好|您好|哈喽|哈罗|嗨|hi|hello|hey|在吗|在么|在不在|早上好|上午好|中午好|下午好|晚上好|晚安|谢谢|多谢|感谢|辛苦了|拜拜|再见|你是谁|你叫什么|你是干嘛的|你能做什么|有什么功能)[!！。~～?？\s]*$/i;
+
+/**
+ * 跨领域越界请求（翻译/写代码/写诗/常识问答）：本地直接拒绝，不浪费 Token。
+ * 特征词刻意避开"计算"这类业务语境词（"年假怎么计算"是业务问题，要引导 HR，
+ * 不能误拦成越界拒绝）。
+ * 业务语境豁免：含 BIZ_CONTEXT_RE 的句子是"问公司文件里的词"（业务辅助），
+ * 不本地拦截，放行走 LLM 解释分支。
+ */
+const OFFTOPIC_RE =
+  /翻译|translate|翻成|译成|用英文说|英文怎么说|写代码|一段代码|代码|编程|python|javascript|typescript|golang|java\b|算法|冒泡|快排|排序算法|写诗|作诗|写首|写文章|写作文|写小说|写故事|解方程|微积分|物理题|化学题/i;
+
+/** 业务语境词：出现即视为"问公司文件/材料里的内容"，越界拦截对其豁免 */
+const BIZ_CONTEXT_RE =
+  /入职|材料|合同|制度|手册|员工手册|offer|条款|文件|协议|通知|邮件|背调|试用期通知/i;
 
 /** 情绪宣泄 / 状态吐槽：本地安抚，不走 LLM（秒回、零幻觉） */
 const EMO_RE =
@@ -52,11 +68,43 @@ export const EMO_REPLY =
 /** 天气寒暄接话 */
 export const WEATHER_REPLY = '是呀，这天气出门都不容易～有入职相关的问题随时问我哦。';
 
-/** 命中纯闲聊/情绪/天气返回本地拟人回复，否则 null（交 LLM 兜底链） */
+/**
+ * 日期/星期/时间问句：本地直接用系统时钟回答——比 LLM 更准更稳（LLM 没有时间概念，
+ * 就算注入了上下文也可能飘），零延迟零幻觉。
+ * 事件日期（入职那天是星期几/放假安排）不算——那是业务问题，交 LLM 业务分支。
+ */
+const DATE_RE = /星期几|周几|礼拜几|今天.{0,6}(几号|日期|日子)|现在几点|今天是什么(时候|日子)/i;
+
+/** 问日期时排除的事件词：命中说明问的是某个事件对应的日期，不是"现在" */
+const DATE_EVENT_RE = /入职|报到|面试|offer|放假|节假日|发薪|发工资|工资日/i;
+
+/** 系统时间回复（Asia/Shanghai，每次实时生成） */
+export function nowReply(): string {
+  const nowText = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+  }).format(new Date());
+  return `今天是${nowText}哦～时间以你手机为准最靠谱。我能帮您解答入职流程、材料上的问题，随时问我～`;
+}
+
+/** 角色边界拒绝语（越界请求统一话术，与 SYSTEM_PROMPT 的【角色边界禁令】同一口径） */
+export const OFFTOPIC_REPLY =
+  '我是小初，主要帮你解答入职相关的问题哦～遇到材料、流程等难题，随时问我。';
+
+/** 命中纯闲聊/越界/情绪/天气返回本地拟人回复，否则 null（交 LLM 兜底链） */
 export function matchChitchat(message: string): string | null {
   const text = message.trim();
-  if (!text || text.length > 25) return null;
+  if (!text || text.length > 40) return null;
   if (CHITCHAT_RE.test(text)) return CHITCHAT_REPLY;
+  // 越界请求（翻译/写代码/写诗…）优先于业务词判定；但带业务语境的豁免——
+  // "入职通知里的 certificate 是什么意思"是业务辅助，放行走 LLM 解释分支。
+  if (OFFTOPIC_RE.test(text) && !BIZ_CONTEXT_RE.test(text)) return OFFTOPIC_REPLY;
+  // 日期/星期/时间问答：本地系统时钟直接回答（"今天是星期几""你不知道今天是星期几吗"
+  // 都在这层收口，绝不触发越界拒答或"联系 HR"兜底）。事件日期除外。
+  if (DATE_RE.test(text) && !DATE_EVENT_RE.test(text)) return nowReply();
   // 带强业务词的不是纯情绪（"不想上班，公积金怎么交"），交 LLM 按业务分支兜底
   if (BUSINESS_RE.test(text)) return null;
   if (EMO_RE.test(text)) return EMO_REPLY;
@@ -65,13 +113,29 @@ export function matchChitchat(message: string): string | null {
 }
 
 /**
- * LLM 输出后置闸门：按用户原话是否含强业务词分流验收。
+ * 业务词汇解释线：原话含英文词 + 公司文件/材料语境 → 用户在问 HR 材料里的生词，
+ * LLM 的职责是直接解释（SYSTEM_PROMPT 二·六第 2 条），回复不需要"联系 HR"引导。
+ * 导出版供 local-workflow 在 FAQ 匹配**之前**判定——否则"材料里的 certificate
+ * 是什么意思"会被"材料"关键词带偏成材料清单，答非所问。
+ */
+export function isBizTermExplain(userMessage: string): boolean {
+  return /[a-z]{2,}/i.test(userMessage) && BIZ_CONTEXT_RE.test(userMessage);
+}
+
+/**
+ * LLM 输出后置闸门：按用户原话的意图分流验收。
  * @param text LLM 的回复
- * @param userMessage 用户原话（用于判定业务/非业务线；缺省按非业务处理）
+ * @param userMessage 用户原话（用于判定业务/解释/非业务线；缺省按非业务处理）
  */
 export function isSoftFallbackTrustworthy(text: string, userMessage = ''): boolean {
   if (!text || text.length > 200) return false;
   if (BANNED_RE.test(text)) return false;
+  // 时间线：原话问当前日期/星期/时间 → 用注入的时间回答即放行（本地层没接住的漏网），
+  // 不要求"联系 HR"特征——"今天是星期四"没有 HR 也是正确回答。
+  if (DATE_RE.test(userMessage) && !DATE_EVENT_RE.test(userMessage)) return true;
+  // 解释线（优先于业务线）：问公司文件里的英文词 → 直接解释即放行，
+  // 不要求"联系 HR"特征——否则"certificate 是学历证明"会被误杀回兜底。
+  if (isBizTermExplain(userMessage)) return true;
   // 业务线：原话问的是公司事务 → 回复必须保留兜底引导特征，否则视为借机编造政策
   //（比如"社保比例是 X%"这种具体答案，知识库没有就是编的），一律拒收回静态话术。
   if (BUSINESS_RE.test(userMessage)) {
@@ -81,7 +145,7 @@ export function isSoftFallbackTrustworthy(text: string, userMessage = ''): boole
   return true;
 }
 
-const SOFTEN_RULES = `【本轮任务】知识库检索未命中，需要你接住用户的这句话。先判断消息类型，再二选一：
+const SOFTEN_RULES = `【本轮任务】知识库检索未命中，需要你接住用户的这句话。先判断消息类型，再四选一：
 
 A. 业务咨询（问政策/材料/流程/薪资/社保/时间地点等公司事务）——
    1. 保留原意"不清楚，建议联系 HR"：语气可以更温和拟人，但不得弄丢"联系 HR"的引导。
@@ -90,16 +154,29 @@ B. 情绪宣泄 / 闲聊（吐槽累了烦了、打招呼、自我介绍如"我�
    1. 像朋友一样共情接话、安抚鼓励，做真实的情绪回应。
    2. 绝对不要提"联系 HR""入职""报到"，不要把话题拐回工作问答。
    3. 不编造公司政策，不做任何承诺。
+C. 跨领域越界请求（纯翻译外语、写代码、写诗写文章、常识百科等，与公司业务无关）——
+   一律不执行，统一回复："我是小初，主要帮你解答入职相关的问题哦～遇到材料、流程等难题，随时问我。"
+   绝对不要给出任何翻译结果、代码或百科答案，也不要提"联系 HR"。
+D. 业务词汇解释（问入职材料/合同/制度/员工手册/Offer 等公司文件中出现的英文词）——
+   这是业务辅助，必须热心解答：直接给出该词在 HR/法律场景下准确、通俗的中文解释，
+   可补充一句"具体以公司文件为准"；不要提"联系 HR"，不要拒答；
+   不得编造公司-specific 的条款内容，只解释词汇本身的通用含义。
+E. 日期/星期/时间询问（今天是星期几、现在几点等）——
+   用系统提示词头部注入的时间直接回答，不要说不知道，不要引导找 HR；
+   不要推测节假日、发薪日等其他日期安排。
+F. 用户质疑你的能力（"你连这个都不知道""你怎么帮我处理"）——
+   温和解释自己的边界，不甩锅、不摆烂：如"我能帮您解答入职流程和材料上的问题，
+   具体时间以您手机为准最靠谱哦～"，顺势引导回入职话题。绝不引导找 HR。
 
 通用要求：最多两句话，80 字以内，纯文本，不带列表/表情/JSON；只输出回复本身。`;
 
 /**
- * LLM 兜底：业务问题 → 温和引导 HR；情绪/闲聊 → 共情回应。
+ * LLM 兜底：业务问题 → 温和引导 HR；情绪/闲聊 → 共情回应；时间/质疑 → 见 E/F。
  * 返回 null = 无 Key / 调用失败 / 输出未过后置闸门，调用方应回 FALLBACK_TEXT。
  */
 export async function softenFallback(userMessage: string): Promise<string | null> {
   const text = await callLlm([
-    { role: 'system', content: `${SYSTEM_PROMPT}\n\n${SOFTEN_RULES}` },
+    { role: 'system', content: `${buildLiveSystemPrompt()}\n\n${SOFTEN_RULES}` },
     {
       role: 'user',
       content: `知识库没有匹配到这条输入，请按规则接话。用户原话：${userMessage}`,

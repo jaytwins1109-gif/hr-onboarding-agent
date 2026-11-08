@@ -26,11 +26,14 @@ import {
 import {
   CHITCHAT_REPLY,
   EMO_REPLY,
+  OFFTOPIC_REPLY,
   WEATHER_REPLY,
   isSoftFallbackTrustworthy,
   matchChitchat,
+  nowReply,
   softenFallback,
 } from '@/lib/llm/fallback';
+import { buildLiveSystemPrompt, buildTimeContext } from '@/lib/prompts/system-prompt';
 import { prisma } from '@/lib/db';
 
 afterEach(() => {
@@ -179,6 +182,43 @@ describe('matchChitchat（本地闲聊分流，零网络）', () => {
     expect(matchChitchat('今天天气真好')).toBe(WEATHER_REPLY);
   });
 
+  it('跨领域越界请求（翻译/写代码）→ 本地统一拒绝语，不执行任务', () => {
+    expect(matchChitchat('将 community 翻译成中文')).toBe(OFFTOPIC_REPLY);
+    expect(matchChitchat('帮我翻译一下 notebook')).toBe(OFFTOPIC_REPLY);
+    expect(matchChitchat('帮我写一段 Python 冒泡排序')).toBe(OFFTOPIC_REPLY);
+  });
+
+  it('业务语境豁免：问公司文件里的英文词 → 不拦截，放行 LLM 解释分支', () => {
+    expect(matchChitchat('入职材料里的 certificate 是什么意思？')).toBeNull();
+    expect(matchChitchat('员工手册里的 NDA 是什么？')).toBeNull();
+    // 与公司文件相关的翻译请求也算业务辅助，不再拒答
+    expect(matchChitchat('帮我翻译一下入职材料里的英文')).toBeNull();
+  });
+
+  it('日期/时间问答 → 本地系统时钟秒答（含质疑句），绝不触发越界拒答或 HR 兜底', () => {
+    const reply = matchChitchat('今天是星期几？');
+    expect(reply).toBe(nowReply());
+    expect(reply).toContain('星期');
+    expect(matchChitchat('你不知道今天是星期几吗')).toBe(nowReply());
+    expect(matchChitchat('今天几号')).toBe(nowReply());
+    expect(matchChitchat('现在几点')).toBe(nowReply());
+  });
+
+  it('事件日期不本地抢答（入职那天是星期几走 LLM 业务分支）', () => {
+    expect(matchChitchat('入职那天是星期几')).toBeNull();
+  });
+
+  it('buildTimeContext 注入真实系统时间且指向 Asia/Shanghai', () => {
+    const ctx = buildTimeContext();
+    expect(ctx).toContain('Asia/Shanghai');
+    expect(ctx).toMatch(/20\d\d年/);
+    expect(buildLiveSystemPrompt()).toContain(ctx);
+  });
+
+  it('业务语境里的"计算"不被误拦成越界（年假计算仍走业务兜底链）', () => {
+    expect(matchChitchat('年假怎么计算')).toBeNull();
+  });
+
   it('问候/情绪后带强业务词 → 不分流（交 LLM 按业务分支兜底）', () => {
     expect(matchChitchat('你好，社保怎么交')).toBeNull();
     expect(matchChitchat('你好呀，请问工资几号发')).toBeNull();
@@ -216,6 +256,21 @@ describe('softenFallback（LLM 输出必须过后置闸门）', () => {
     expect(isSoftFallbackTrustworthy('张三你好呀，以后多多关照～', '我叫张三，以后多关照')).toBe(
       true,
     );
+  });
+
+  it('词汇解释线：HR 材料里的英文词解释 → 直接放行，不要求"联系 HR"', () => {
+    expect(
+      isSoftFallbackTrustworthy(
+        'certificate 一般指证明文件，入职材料里通常指学历/学位证明',
+        '入职材料里的 certificate 是什么意思？',
+      ),
+    ).toBe(true);
+    expect(
+      isSoftFallbackTrustworthy(
+        'NDA 是保密协议的缩写，签了就不能对外披露公司信息',
+        '员工手册里的 NDA 是什么？',
+      ),
+    ).toBe(true);
   });
 
   it('政治/色情特征 → 无论什么线都拒收', () => {
@@ -292,6 +347,45 @@ describe('runLocalWorkflow 兜底接线（批次10）', () => {
     });
     expect(reply).toBe(CHITCHAT_REPLY);
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('未匹配 + 越界请求（翻译/代码）→ 本地拒绝语，零 Token（不打 LLM）', async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    for (const message of [
+      '将 community 翻译成中文',
+      '帮我翻译一下 notebook',
+      '帮我写一段 Python 冒泡排序',
+    ]) {
+      const reply = await runLocalWorkflow({
+        message,
+        userRole: 'new_hire',
+        outputMode: 'chat_text',
+      });
+      expect(reply).toBe(OFFTOPIC_REPLY);
+    }
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('词汇解释意图优先于 FAQ 命中：问"材料里的 certificate"直接解释而非甩材料清单', async () => {
+    vi.stubEnv('DEEPSEEK_API_KEY', 'test-key');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          choices: [
+            { message: { content: 'certificate 指证明文件，入职材料里通常指学历/学位证明' } },
+          ],
+        }),
+      })),
+    );
+    const reply = await runLocalWorkflow({
+      message: '入职材料里的 certificate 是什么意思？',
+      userRole: 'new_hire',
+      outputMode: 'chat_text',
+    });
+    expect(reply).toBe('certificate 指证明文件，入职材料里通常指学历/学位证明');
   });
 
   it('未匹配 + 业务问题 + LLM 可用 → 温和话术', async () => {

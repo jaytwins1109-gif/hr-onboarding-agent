@@ -42,7 +42,7 @@ const faqs = [
     id: 'faq_hr_onboarding_003',
     question: '入职咨询应该联系谁？',
     answer:
-      '请优先通过 offer 邮件或入职通知中的 HR 对接人咨询；如果找不到具体联系方式，请回复“不清楚，建议联系 HR”，由 HR 人工协助确认。',
+      '请优先通过 offer 邮件或入职通知中的 HR 对接人咨询；如果找不到具体联系方式，建议您直接联系公司 HR 部门或前台协助确认。',
     tags: ['联系HR', '入职咨询', '新员工'],
     scope: 'new_hire_public',
     allowedRoles: ['new_hire'],

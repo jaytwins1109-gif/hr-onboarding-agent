@@ -16,7 +16,7 @@
 
 import { prisma } from '@/lib/db';
 import type { KnowledgeItem } from '@prisma/client';
-import { matchChitchat, softenFallback } from './fallback';
+import { isBizTermExplain, matchChitchat, softenFallback } from './fallback';
 
 export const FALLBACK_TEXT = '不清楚，建议联系 HR。';
 
@@ -141,6 +141,13 @@ export async function runLocalWorkflow(input: LocalWorkflowInput): Promise<Local
       scope: 'new_hire_public',
     },
   });
+
+  // 词汇解释意图优先于 FAQ 命中：问"材料里的 certificate 是什么意思"若不先拦，
+  // 会被"材料"关键词带偏成材料清单，答非所问。这是业务辅助（SYSTEM_PROMPT 二·六），
+  // 直接交 LLM 解释分支；structured_json 契约不受影响，仍走原流程。
+  if (input.outputMode === 'chat_text' && isBizTermExplain(input.message)) {
+    return matchChitchat(input.message) ?? (await softenFallback(input.message)) ?? FALLBACK_TEXT;
+  }
 
   const visible = items.filter((item) => canAccessKnowledgeItem(item, input.userRole));
   const { best, score } = matchFaq(input.message, visible);
