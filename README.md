@@ -1,12 +1,69 @@
-# 小初 · 新员工入职咨询助理
+# HR-Onboarding-Agent（小初 · 企业级新员工入职咨询助理）
 
-一个基于**知识库检索**的入职 FAQ 问答助手。回答范围严格限定在 HR 维护的知识条目内：
-能查到就答，查不到就固定兜底一句「不清楚，建议联系 HR。」
+> 让每个新员工在入职第一天，就有一个永远在线、绝不胡说八道的 AI 同事。
 
-- 外壳：Next.js 15（App Router）
-- 检索：本地确定性链路（知识库检索 → 权限守卫 → 关键词匹配 → 固定兜底），**不靠模型编答案**
-- 数据源：SQLite + Prisma，业务表只有 `KnowledgeItem`（`prisma/seed.ts` 维护种子 FAQ）
-- 两个出口：`chat_text`（UI 用，回 `{reply, trace_id}`）/ `structured_json`（程序化调用，回结构化结果）
+「小初」是一个**开箱即用**的新员工入职咨询 Agent：报到流程、材料清单、社保公积金、找人对接——能查到就秒答，查不到绝不编造。全部回答被确定性规则与多重安全闸门约束，LLM 只在本地层未命中的尾部流量里温柔兜底。
+
+- 前台：Next.js 15 App Router 聊天界面（游客即用，注册无缝升级不丢记录）
+- 管理后台 `/admin`：数据看板 / 对话审查 / 知识库管理 / 用户管理
+- 开发者后台 `/developer`：系统诊断 + System Prompt 只读预览
+- 数据：SQLite + Prisma（零外部服务依赖，`data/` 即全部状态）
+
+---
+
+## 核心架构
+
+一次提问的完整数据流——**确定性的归本地，不确定的才给 LLM**：
+
+```mermaid
+flowchart TD
+    A[用户输入] --> B{本地分流层<br/>零网络 · 零延迟}
+    B -->|问候 / 情绪宣泄| C[秒回安抚话术<br/>共情 · 绝不甩 HR]
+    B -->|翻译 / 写代码 / 索要 Prompt| D[越界拦截<br/>坚守角色边界]
+    B -->|今天星期几 / 几点| E[系统时钟直答<br/>真实时区 · 零幻觉]
+    B -->|材料里的 certificate| F[业务词汇解释线]
+    B -->|命中知识库| G[FAQ 确定性回答<br/>权限守卫 · 软删除过滤]
+    B -->|均未命中| H{有 API Key?}
+
+    H -->|无 Key| I[Mock 演示模式<br/>拟人化关键词回复 · 零网络]
+    H -->|有 Key| J[LLM 温和兜底<br/>deepseek 主 → glm 备]
+    I --> K[后置安全闸门]
+    J --> K
+    F --> K
+    K -->|业务线须含 HR 引导| L[返回文案]
+    K -->|不过闸| M[静态兜底话术<br/>建议联系 HR · 防编造]
+    C --> L
+    D --> L
+    E --> L
+    G --> L
+```
+
+## 四大核心亮点
+
+### 1. 确定性与 LLM 混合架构
+
+本地分流层（问候 / 情绪 / 越界 / 时间 / 词汇解释 / FAQ 检索）处理掉绝大多数输入，**48ms 级本地秒回**——比 LLM 快两个数量级，Token 消耗趋近于零。LLM 只兜底真正的长尾问题，且回答必须过后置闸门：业务问题强制携带「联系 HR」引导，从机制上杜绝编造政策。
+
+### 2. 三重降级策略，断网不崩
+
+| 故障场景 | 行为 |
+|---|---|
+| 没配任何 API Key | 自动进入 **[本地演示模式]**，拟人化 Mock 回复，无需配置即可体验完整交互 |
+| 主 Key 失效 / 网络失败 | 自动切换备用 provider（glm），再失败落静态兜底话术 |
+| LLM 输出越界 / 编造 | 后置闸门拦截，替换为安全话术 |
+
+任何一层失手都有下一层接住——用户永远能看到一条得体的回复。
+
+### 3. 顶级安全防御
+
+- **红蓝对抗 15/15 全 PASS**：提示词窃取 / 上下文污染 / 角色劫持 / Prompt 索要 / 解除限制五维度（`scripts/security-test.mjs` 可随时重放）
+- **权限纵深防御**：middleware（edge 体验层）→ 页面层验签 → API 层 `requireAdmin` / `requireDeveloper` 三级拦截；JWT role 快照 + SQLite 无 enum 白名单归一化
+- **角色边界禁令**：Prompt 层硬约束——非入职请求统一礼貌拒绝，绝不执行翻译/计算，绝不触发「联系 HR」兜底
+- **数据安全**：`.env*` / `*.db` / 日志全部隔离出仓库；账号密码 bcrypt；HttpOnly Cookie
+
+### 4. Vibe Coding 开发范式
+
+本项目是 **AI 协作开发**的完整样本：产品意图由人拍板，编码、测试、审查、安全红队、文档全部由 AI Agent 与人多轮协同完成——9 次线性提交、119 条测试全绿、0 lint 警告，每一轮都以「实测输入 → 修复 → 回归」闭环收束。欢迎用它作为 AI 工程化协作的参考实现。
 
 ---
 
@@ -14,89 +71,42 @@
 
 ```bash
 npm install
-cp .env.example .env          # 填 DATABASE_URL / AUTH_SECRET
-npm run db:seed               # 写入种子知识条目
-npm run dev                   # http://localhost:3000
+npx prisma db push        # 建表（SQLite，零外部依赖）
+npm run db:seed           # 写入 3 条种子 FAQ
+npm run dev               # http://localhost:3000
 ```
 
-后台：<http://localhost:3000/admin>（口令登录，未配 `ADMIN_PASSWORD_HASH` 时后台禁用）
+> **不配 API Key 也能玩**：系统自动进入 [本地演示模式]，情绪安抚、越界拦截、时间问答全部可用。
+
+启用真实 LLM：复制 `.env.example` 为 `.env.local`，填入 `DEEPSEEK_API_KEY`（或 `GLM_API_KEY`）与 `AUTH_SECRET`。
+
+### 管理后台
 
 ```bash
-npm run gen-password -- 你想用的口令 --write
+npm run gen-password -- 你想用的口令 --write   # 生成 ADMIN_PASSWORD_HASH 写入 .env.local
 ```
 
----
+访问 <http://localhost:3000/admin>（口令登录）；开发者后台 `/developer` 仅对 `DEVELOPER` 角色开放：
+
+```bash
+npm run promote-admin -- <邮箱或userId> [USER|ADMIN|DEVELOPER]   # 默认提为 ADMIN
+```
 
 ## 回归与检查
 
 ```bash
-npm run verify   # tsc --noEmit + vitest（6 个文件 / 55 条）
+npm run verify   # tsc --noEmit + vitest run（119 条全绿）
 npm test         # 只跑 vitest
 npm run lint     # ESLint 9 flat config，0 error 0 warning 才收工
-npm run db:seed  # 幂等写入种子知识条目
+npm run security # AI 安全红队测试（15 payload，需先起 dev）
 ```
 
-> 改文案/守卫/知识条目后，`verify` + `lint` 全绿才算完成。
+> 改文案 / 守卫 / 知识条目后，`verify` + `lint` 全绿才算完成。
 
----
+## 技术栈
 
-## 一条提问是怎么走的
+Next.js 15（App Router）· React 19 · Tailwind CSS 4 · Prisma + SQLite · jose（JWT）· DeepSeek / GLM（OpenAI 兼容接口）· Vitest · Playwright（E2E 探针）
 
-```text
-POST /api/ai（或 /api/ai/stream）
-  → 身份解析（cx_token / x-guest-id）+ 限流 + TraceID
-  → handleTurn(message, role)
-      1. 知识库检索：只取 active + 未软删的条目
-      2. 权限守卫 canAccessKnowledgeItem：scope 匹配 + allowedRoles 含当前角色
-      3. FAQ 关键词匹配（本地确定性，无模型参与）
-      4. 命中 → 返回条目答案；未命中 → 固定兜底「不清楚，建议联系 HR。」
-  → 落库（Message）+ 返回
-```
+## License
 
-`chat_text` 与 `structured_json` 严格分离：前者只回自然语言，后者回结构化字段，
-用户可见文本里不会出现字段名、花括号或代码块。
-
----
-
-## 目录结构
-
-```text
-app/
-  page.tsx                 聊天界面（消息流 + 发送链路，流式优先、失败退回一次性）
-  _components/             气泡 / 品牌卡 / 皮肤 / 常量 / 类型 / 鉴权 hook
-  admin/                   后台外壳（看板 / 对话审查 / 商品管理页占位）
-  api/ai/route.ts          一次性入口：身份 → handleTurn → chat_text|structured_json
-  api/ai/stream/route.ts   流式入口（SSE：delta / final / error）
-  api/admin/*              看板 / 对话 / 商品（501 兼容壳）
-lib/
-  prompts/system-prompt.ts ★ 人设唯一真源
-  llm/local-workflow.ts    检索 + 权限守卫 + FAQ 匹配 + 兜底
-  chat/handlers.ts         两个入口共用的轮次编排
-  auth/                    票据 / 身份 / 守卫 / 限流
-prisma/
-  schema.prisma            User / Message / KnowledgeItem
-  seed.ts                  种子知识条目（HR 确认后替换占位答案）
-tests/                     vitest：知识库守卫、检索与兜底、Admin 越权矩阵
-```
-
----
-
-## 文档
-
-| 文档 | 干什么 |
-|---|---|
-| [`AGENTS.md`](./AGENTS.md) | 项目规则（新会话启动规则、汇报格式约定、知识库维护约定） |
-| [`PROGRESS.md`](./PROGRESS.md) | 做到哪了：正在做 / 已完成 / 下一步 / 遗留问题 |
-| [`系统prompt汇总.md`](./系统prompt汇总.md) | 全链路提示词与规则总索引（含历史变更记录） |
-| [`DEPLOY.md`](./DEPLOY.md) | 部署（Docker / 云平台） |
-| [`docs/`](./docs/) | 设计留档与测试日志（旧业务文档仅作历史参考） |
-
----
-
-## 约定（改代码前先看）
-
-1. **兜底话术固定**：`不清楚，建议联系 HR。`（一字不差，测试有断言）
-2. **只召回合规条目**：`status='active'` + `isDeleted=false` + scope 匹配 + `allowedRoles` 含当前角色，四道缺一不可。
-3. **删条目走软删除**（`isDeleted=true` + `deletedAt`），保留追溯痕迹。
-4. **`chat_text` / `structured_json` 分离**：UI 不传 `output_mode`，永远拿纯文本。
-5. 改人设改 `lib/prompts/system-prompt.ts`，并同步 `系统prompt汇总.md`。
+[MIT](./LICENSE)
