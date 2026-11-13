@@ -57,13 +57,16 @@ async function sign(
 }
 
 /**
- * 用户角色。库里存的是文本（SQLite 无 enum），这里归一成三个合法值：
- * 票里的 role 是签发时快照，**非白名单值一律按 USER 处理**——
- * 不信任票里的任意字符串。DEVELOPER 是最高权限（兼容 /admin 全部能力）。
+ * 用户角色（工作台四角色，文档第 3 步）。库里存的是文本（SQLite 无 enum），
+ * 这里归一成四个合法值：票里的 role 是签发时快照，**非白名单值一律按 USER 处理**——
+ * 不信任票里的任意字符串。
+ * 映射：USER→员工、ADMIN→HR 管理员、PRODUCT_OPS→产品运营、DEVELOPER→系统管理员。
+ * 旧后台守卫（/admin、/developer）仍只认 ADMIN / DEVELOPER，新增的产品运营进不去，
+ * 符合职责分离；后台拆分与按角色分流属于文档阶段 12。
  */
-export type UserRole = 'USER' | 'ADMIN' | 'DEVELOPER';
+export type UserRole = 'USER' | 'ADMIN' | 'PRODUCT_OPS' | 'DEVELOPER';
 export function normalizeRole(role?: string | null): UserRole {
-  if (role === 'ADMIN' || role === 'DEVELOPER') return role;
+  if (role === 'ADMIN' || role === 'PRODUCT_OPS' || role === 'DEVELOPER') return role;
   return 'USER';
 }
 

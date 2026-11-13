@@ -1,5 +1,15 @@
 # 项目规则
 
+> ## 【当前项目口径 · 2026-11-13】（手写补充，IDE 重新生成时请贴回）
+>
+> 本工作区正在按根目录 `chujian.txt` 从零构建「初见 ONBOARD」员工服务工作台。
+> 下方的「提示词同步 / 知识库条目四道守卫 / 接口契约」等规则表是旧「小初 HR FAQ」项目的历史留档，
+> 运行时真源已是 `lib/workspace/*`、`app/workspace/*`、`app/api/workspace/*`；
+> 回归入口为 `npm run verify` / `npm test` / `npm run lint` / `npm run format:check`，旧的 `smoke` / `guard` 不存在。
+> 制度可见性以 `lib/workspace/policies.ts` 的 `canViewPolicy()` 为准，年假与模型配置权限以 `lib/workspace/access.ts` 为准。
+> **汇报格式约定与【新会话启动规则】仍然长期生效**；但用户已明确要求多阶段任务「做完就继续做，不用询问，做完再给总结」，
+> 因此不要逐阶段停下来问方向。
+
 ## 【新会话启动规则】先读三个文件，再动手
 
 每次开启新的会话（或者用户让你"继续之前的开发"），**第一件事**必须是读取以下文件：

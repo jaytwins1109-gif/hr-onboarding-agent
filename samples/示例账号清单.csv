@@ -1,0 +1,16 @@
+﻿姓名,员工编号,部门,角色,登录账号,示例密码,备注
+李知微,CX-0001,产品部,员工,cx-0001@example.com,DemoPass12345,模拟数据：仅用于本机演示
+陈望舒,CX-0002,产品部,员工,cx-0002@example.com,DemoPass12345,模拟数据：仅用于本机演示
+赵一诺,CX-0003,产品部,员工,cx-0003@example.com,DemoPass12345,模拟数据：仅用于本机演示
+王思远,CX-0004,技术部,员工,cx-0004@example.com,DemoPass12345,模拟数据：仅用于本机演示
+孙浩然,CX-0005,技术部,员工,cx-0005@example.com,DemoPass12345,模拟数据：仅用于本机演示
+吴清越,CX-0006,技术部,员工,cx-0006@example.com,DemoPass12345,模拟数据：仅用于本机演示
+郑可欣,CX-0007,销售部,员工,cx-0007@example.com,DemoPass12345,模拟数据：仅用于本机演示
+冯嘉言,CX-0008,销售部,员工,cx-0008@example.com,DemoPass12345,模拟数据：仅用于本机演示
+许静怡,CX-0009,财务部,员工,cx-0009@example.com,DemoPass12345,模拟数据：仅用于本机演示
+蒋明哲,CX-0010,财务部,员工,cx-0010@example.com,DemoPass12345,模拟数据：仅用于本机演示
+沈书瑶,CX-0011,人力资源部,员工,cx-0011@example.com,DemoPass12345,模拟数据：仅用于本机演示
+韩亦然,CX-0012,人力资源部,员工,cx-0012@example.com,DemoPass12345,模拟数据：仅用于本机演示
+林若彤,CX-0100,人力资源部,HR 管理员,cx-0100@example.com,DemoPass12345,模拟数据：仅用于本机演示
+周予安,CX-0101,产品部,产品运营,cx-0101@example.com,DemoPass12345,模拟数据：仅用于本机演示
+示例管理员,CX-0199,人力资源部,系统管理员,cx-0199@example.com,DemoPass12345,模拟数据：脚本兜底创建的工作空间管理员

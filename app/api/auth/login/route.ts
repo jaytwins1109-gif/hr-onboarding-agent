@@ -45,7 +45,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !user.password || user.isGuest) {
+    // 工作台停用状态在这里同样生效：否则停用账号能从旧 C 端登录绕进工作台体系
+    if (!user || !user.password || user.isGuest || !user.isActive) {
       return NextResponse.json({ error: '邮箱或密码不对' }, { status: 401 });
     }
 

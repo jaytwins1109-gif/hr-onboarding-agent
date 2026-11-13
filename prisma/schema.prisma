@@ -27,6 +27,16 @@ model User {
   email          String?  @unique // 游客为 null
   password       String? // bcrypt hash，游客为 null
   isGuest        Boolean  @default(true)
+  /// 工作台展示用的姓名/部门（可空：老账号与游客没有这两项，界面显示「未设置」）。
+  /// 与 auth 角色正交，不参与鉴权判断。
+  name           String?
+  department     String?
+  /// 员工编号：登录页「员工编号 / 员工账号」的第二种标识（可空唯一，老账号没有）。
+  /// 由管理员分配，编号的生成与批量维护属于后续步骤。
+  employeeNo     String?  @unique
+  /// 是否启用：停用账号禁止登录，带旧票据直闯工作台也会被服务端拒绝。
+  /// 默认 true，老账号与游客不受影响；停用由管理员在后续员工管理步骤维护。
+  isActive       Boolean  @default(true)
   /// "USER" | "ADMIN"（SQLite 无 enum，类型安全由 lib/auth 的 TS 联合类型守）
   /// 签发 JWT 时作为快照写进 payload；缺省 USER，旧 token 自动降级
   role           String   @default("USER")
@@ -41,6 +51,45 @@ model User {
   updatedAt      DateTime @updatedAt
 
   messages Message[]
+}
+
+/// 工作台部门目录（文档第 4/6 步）：员工管理与组织架构共用这一份，
+/// 不靠 User.department 去重去猜有哪些部门。预置 5 个示例部门由 lib/workspace/departments.ts 幂等写入。
+model Department {
+  id        String   @id
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("departments")
+}
+
+/// 制度知识库（文档第 8/9 步）：原始文件保存在 data/policies/（已被 .gitignore 排除），
+/// 解析出的正文入库供详情预览与后续问答引用。
+/// status: queued 排队中 → parsing 解析中 → pending 待发布 / failed 失败
+///         → published 已发布 / archived 已下架
+model PolicyDocument {
+  id             String    @id
+  name           String
+  category       String
+  /// 'all' 全员，或某个部门名
+  scope          String    @default("all")
+  version        String
+  /// YYYY-MM-DD；只有生效日期不晚于今天且已发布的制度才对员工可见
+  effectiveDate  String    @map("effective_date")
+  status         String    @default("queued")
+  failureReason  String?   @map("failure_reason")
+  content        String    @default("")
+  fileName       String    @map("file_name")
+  filePath       String    @map("file_path")
+  mimeType       String    @map("mime_type")
+  uploadedById   String    @map("uploaded_by_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  publishedAt    DateTime? @map("published_at")
+  archivedAt     DateTime? @map("archived_at")
+
+  @@index([status])
+  @@map("policy_documents")
 }
 
 /// 聊天日志（V3.0 Admin「对话审查」数据源）。
@@ -91,4 +140,55 @@ model KnowledgeItem {
   @@index([status, isDeleted])
   @@index([scope])
   @@map("knowledge_items")
+}
+
+/// 年假台账（文档第 11~13 步）：余额不落字段，恒等于该员工该年度所有流水的合计。
+/// 历史流水只追加、永不删除；调整、导入对账、示例数据都各写一行留痕。
+/// delta 允许 0.5 天粒度，可正可负；kind 区分来源，便于解释余额怎么来的。
+model LeaveLedger {
+  id         String   @id
+  userId     String   @map("user_id")
+  year       Int
+  delta      Float
+  reason     String
+  /// "adjust" 手动调整 / "reconcile" 导入对账 / "grant" 发放 / "taken" 已休 / "demo" 示例数据
+  kind       String
+  operatorId String?  @map("operator_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([userId, year, createdAt])
+  @@map("leave_ledger")
+}
+
+/// 对话模型连接配置（文档第 14 步）：单行记录，密钥以 AES-256-GCM 密文存放。
+/// 明文密钥只在服务端内存里短暂存在，任何接口都不回传浏览器；留空表示沿用已有凭据。
+model ModelConfig {
+  id           String   @id @default("default")
+  endpoint     String
+  modelName    String   @map("model_name")
+  encryptedKey String   @default("") @map("encrypted_key")
+  hasKey       Boolean  @default(false) @map("has_key")
+  temperature  Float    @default(0.3)
+  maxTokens    Int      @default(2048) @map("max_tokens")
+  version      Int      @default(0)
+  updatedById  String?  @map("updated_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("model_configs")
+}
+
+/// 操作审计（文档第 14 步先落记录，页面在第 38 步做）。
+/// 红线：detail 里绝不写密钥、密码或凭据原文。
+model AuditLog {
+  id        String   @id
+  action    String
+  actorId   String   @map("actor_id")
+  actorName String   @map("actor_name")
+  target    String
+  detail    String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("audit_logs")
 }
