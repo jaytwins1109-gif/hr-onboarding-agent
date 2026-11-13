@@ -1,11 +1,11 @@
 # dependencies
-/node_modules
-/.pnp
+node_modules
+.pnp
 .pnp.*
 
 # next
-/.next/
-/out/
+.next/
+out/
 next-env.d.ts
 
 # 环境变量（禁止提交 API Key）
@@ -33,7 +33,7 @@ smoke-*.flag
 *.flag
 
 # 测试产物统一目录（smoke 结果落 tmp/smoke/last-run.txt）
-/tmp/
+tmp/
 
 # 浏览器自动化快照
 .playwright-cli/
@@ -42,7 +42,7 @@ smoke-*.flag
 .codebuddy/
 
 # 长期记忆落盘（含用户偏好，不提交）
-/data
+data
 
 # SQLite 数据库文件（含用户数据与密码哈希，一律不提交）
 # 注意：prisma/migrations/ 是源码，必须提交；这里只挡运行期库文件。
