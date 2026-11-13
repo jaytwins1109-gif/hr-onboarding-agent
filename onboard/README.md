@@ -2,6 +2,11 @@
 
 > 让每个新员工在入职第一天，就有一个永远在线、绝不胡说八道的 AI 同事。
 
+> **目录口径（2026-11-13 起）**：按 `chujian.txt` 规则 8，运行时项目整体位于 `onboard/` 子目录。
+> 本文提到的「项目根」一律指 `onboard/`；**所有 `npm` / `npx prisma` / `docker compose` 命令都要先进入 `onboard/` 再执行**。
+> 工作区根目录只保留留档：`AGENTS.md`、`PROGRESS.md`、`chujian.txt`、`系统prompt汇总.md`、`TEST_LOG.md`、`docs/`。
+> 数据库落在 `onboard/data/`（相对 `onboard/prisma/schema.prisma` 即 `../data`），环境变量文件在 `onboard/.env`。
+
 「小初」是一个**开箱即用**的新员工入职咨询 Agent：报到流程、材料清单、社保公积金、找人对接——能查到就秒答，查不到绝不编造。全部回答被确定性规则与多重安全闸门约束，LLM 只在本地层未命中的尾部流量里温柔兜底。
 
 - 前台：Next.js 15 App Router 聊天界面（游客即用，注册无缝升级不丢记录）
@@ -63,20 +68,23 @@ flowchart TD
 
 ### 4. Vibe Coding 开发范式
 
-本项目是 **AI 协作开发**的完整样本：产品意图由人拍板，编码、测试、审查、安全红队、文档全部由 AI Agent 与人多轮协同完成——9 次线性提交、119 条测试全绿、0 lint 警告，每一轮都以「实测输入 → 修复 → 回归」闭环收束。欢迎用它作为 AI 工程化协作的参考实现。
+本项目是 **AI 协作开发**的完整样本：产品意图由人拍板，编码、测试、审查、安全红队、文档全部由 AI Agent 与人多轮协同完成——线性提交、203 条测试全绿、0 lint 警告，每一轮都以「实测输入 → 修复 → 回归」闭环收束。欢迎用它作为 AI 工程化协作的参考实现。
 
 ---
 
 ## 快速开始
 
+以下命令**都在 `onboard/` 目录下执行**：
+
 ```bash
+cd onboard                 # 从工作区根目录进入运行时项目
 npm install
 npx prisma db push        # 建表（SQLite，零外部依赖）
 npm run dev               # http://localhost:3000
 ```
 
 打开 <http://localhost:3000/workspace>：首次使用按页面提示创建工作空间与管理员账号，之后用「员工登录」进入。
-示例账号与密码见 `samples/示例账号清单.csv`（仅供本机演示）；`/workspace/assistant` 是员工服务助手。
+示例账号与密码见 `samples/示例账号清单.csv`（相对 `onboard/`）；`/workspace/assistant` 是员工服务助手。
 
 > **不配任何密钥也能玩**：工作台没保存模型配置时，系统自动进入 [本地演示模式]，无需配置即可体验完整交互。
 
@@ -96,6 +104,8 @@ npm run promote-admin -- <邮箱或userId> [USER|ADMIN|DEVELOPER]   # 默认提�
 ```
 
 ## 回归与检查
+
+以下命令同样**都在 `onboard/` 目录下执行**：
 
 ```bash
 npm run verify         # tsc --noEmit + vitest run（203 条全绿）

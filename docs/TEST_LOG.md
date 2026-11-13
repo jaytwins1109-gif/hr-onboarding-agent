@@ -196,6 +196,12 @@
 | 11-13 20:12 | 端到端·助手页面 | `npm run workspace:e2e` 第 1~4 组 | 助手页 200 且渲染欢迎区；提问写入 2 条消息（seq 1/2）与占位回复；最近咨询出现新会话、可恢复整段；换账号访问同一 id → 404，别人列表里也不出现 | ✅ | 归属条件同时下推到 Prisma 查询与 `canReadConsultation` |
 | 11-13 20:12 | 端到端·查找测试 | `npm run workspace:e2e` 第 5~7 组 | 员工调 `/api/workspace/retrieval` → 403；管理员查「出差住宿报销上限是多少」召回 4 段，其中一段同时含 500 元与「一线城市」，每段都有制度名 / 版本 / 位置；查「代码评审需要几名评审人」时技术部能召回本部门专属制度、产品部看不到 | ✅ | 21/21 ALL PASS；权限过滤发生在切片与排序之前 |
 | 11-13 20:19 | 浏览器·Edge 实机 | 示例员工账号登录 → `/workspace/assistant` → 点示例问题 → 点侧栏最近咨询 → 输入框回车发第二问 | 欢迎区 / 三张快捷卡片 / 两行说明齐全；点卡片直接发送并出现两条气泡（助手气泡标注「本轮为占位回复，不作为制度依据」）；`router.refresh()` 后侧栏立刻出现最近咨询；点击可恢复整段对话并高亮当前项；回车在同一会话追加第二轮、输入框清空为 0/2000；控制台 0 error 0 warning | ✅ | 实测会话已删除，`consultations` 表残留 0 条；截图 `tmp/assistant-ui.png` |
+| 11-13 21:30 | 迁移·前置 | 停 dev server、工作区干净校验、打 tag、冷备 `data` | `pre-onboard-move-20261113-213045` 已建；`tmp/data-backup-pre-onboard/` 备份 10 个文件（含 `hr-assistant.db`、`policies/`、`backups/`） | ✅ | 备份落在已被忽略的 `tmp/`，不会被 `git add -A` 误提交 |
+| 11-13 21:32 | 迁移·git mv | 33 项运行时目录/文件 → `onboard/`，逐项检查 `$LASTEXITCODE` | 195 条 status 全是 `R`（含中文启动器，100% 相似度）+ 1 条 `.gitignore` 修改，无 `??` / `D`；提交 `2542e42` | ✅ | 留档仍在工作区根；`git mv` 保留文件历史 |
+| 11-13 21:33 | 迁移·路径 | 未跟踪目录搬移 + `.gitignore` 锚定修正 | `onboard/node_modules`、`onboard/data`、`onboard/.env` 经 `git check-ignore -v` 确认仍被忽略；`.env` / `.env.local` 已复制到 `onboard/`；补移 `next-env.d.ts` 后 tsc 可用 | ✅ | `DATABASE_URL=file:../data/hr-assistant.db` 无需改动：`onboard/prisma` → `onboard/data` |
+| 11-13 21:36 | 迁移·全链回归 | 在 `onboard/` 下跑 `verify` / `npm test` / `lint` / `format:check` / `llm:e2e` | vitest 根目录变为 `D:/codebuddy/HR Assistant/onboard`；**17 文件 203/203**、lint 0/0、Prettier 全绿、模型配置真库闭环 ALL PASS | ✅ | 迁移未改任何源码内容 |
+| 11-13 21:40 | 迁移·实机 | 在 `onboard/` 下重启 dev server（pid 6128），请求 `/workspace`，跑 `workspace:e2e` | `/workspace` 200（30284 bytes）；欢迎区、占位回复落库、跨账号 404、员工 403、报销 500 元出处、部门不串台 **21/21 ALL PASS**；测试会话已清理 | ✅ | 证明规则 6/7「之前功能不被改坏、能直接打开」 |
+| 11-13 21:40 | 迁移·遗留待确认 | 开机自启快捷方式 / 测试日志脚本默认路径 | `开机自启.bat` 生成的 `.lnk` 固化旧绝对路径，需重跑重建；`scripts/capture-log.mjs` 默认 `--out docs/TEST_LOG.md`，`docs/` 留根后需显式传 `--out ../docs/TEST_LOG.md` | ⚠️ | 不影响回归与运行，仅口径；本轮未改脚本逻辑 |
 | 11-13 20:12 | 未验 | 真实模型密钥下的 AI 带引用回答 | 本步未做：第 17 段才接入生成与核验，当前助手回复仍是固定占位 | ⚠️ | 需管理员在 `/workspace/model-config` 填真实凭据后单独排期 |
 
 ## 2. 自动归档（`scripts/capture-log.mjs` 追加）

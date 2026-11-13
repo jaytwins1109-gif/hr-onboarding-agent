@@ -9,6 +9,11 @@
 > 制度可见性以 `lib/workspace/policies.ts` 的 `canViewPolicy()` 为准，年假与模型配置权限以 `lib/workspace/access.ts` 为准。
 > **汇报格式约定与【新会话启动规则】仍然长期生效**；但用户已明确要求多阶段任务「做完就继续做，不用询问，做完再给总结」，
 > 因此不要逐阶段停下来问方向。
+>
+> **目录口径 · 2026-11-13**：运行时项目已按 `chujian.txt` 规则 8 整体移入 `onboard/` 子目录。
+> 上文及下方规则表里的 `lib/…`、`app/…`、`prisma/…`、`tests/…`、`samples/…` 等路径**均相对 `onboard/`**；
+> `npm run verify` / `npm test` / `npm run lint` / `npm run format:check` 以及各 e2e 命令也须在 `onboard/` 下执行。
+> 留档（`AGENTS.md`、`PROGRESS.md`、`chujian.txt`、`系统prompt汇总.md`、`TEST_LOG.md`、`docs/`）仍在工作区根目录。
 
 ## 【新会话启动规则】先读三个文件，再动手
 

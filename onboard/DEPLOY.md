@@ -10,8 +10,11 @@
 
 ## 0. 三分钟快速开始
 
+> **目录口径**：运行时项目（含 `Dockerfile`、`docker-compose.yml`、`prisma/`、`package.json`）整体位于仓库的 `onboard/` 子目录。
+> 下文所有命令都在 `onboard/` 下执行，`context: .` 与 `./data` 也都相对 `onboard/`；平台托管时须把构建目录设为 `onboard/`。
+
 ```bash
-git clone <你的仓库地址> hr-assistant && cd hr-assistant
+git clone <你的仓库地址> hr-assistant && cd hr-assistant/onboard
 
 cp .env.example .env
 #   打开 .env，至少填这三项：
@@ -77,6 +80,8 @@ node -e "console.log(require('crypto').createHash('sha256').update('你的口令
 `docker-compose.yml` 里的迁库编排（`depends_on: service_completed_successfully`）**只有 compose 会读**。
 Render / Railway 这类平台拿到仓库后直接 `docker build` 整个 `Dockerfile`（默认构建到最后一个 stage，
 也就是 `runner`——顺序已经为此调整过，别再把它挪回去），然后跑容器，**没有任何迁库步骤**。
+`Dockerfile` 与构建上下文都在 `onboard/`：平台控制台里的 Dockerfile 路径／构建目录要指向 `onboard/`，
+不能用仓库根，否则会找不到 `package.json`。
 
 按平台分两条走法：
 
@@ -87,6 +92,7 @@ Render 的 Native Environment（不是 Docker Runtime）自带 **Pre-Deploy Comm
 
 | 配置项 | 值 |
 |---|---|
+| Root Directory | `onboard`（不设会在仓库根找不到 `package.json`） |
 | Environment | `Node` |
 | Build Command | `npm ci && npx prisma generate && npm run build` |
 | Pre-Deploy Command | `npx prisma migrate deploy` |
