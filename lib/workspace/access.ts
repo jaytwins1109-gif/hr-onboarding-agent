@@ -83,6 +83,14 @@ export function canConfigureModel(role?: string | null): boolean {
 }
 
 /**
+ * 「查找测试」小页面（文档第 16 步第 5 条）：仅管理员可用。
+ * 页面隐藏菜单只是体验，接口必须再调一次同一个函数。
+ */
+export function canUseRetrievalTest(role?: string | null): boolean {
+  return canManageEmployees(role);
+}
+
+/**
  * 「我的年假」的红线（文档第 12 步）：员工只能看自己的记录。
  * 即使知道别人的页面地址、或直接打接口带别人的 userId，也在这里被拒。
  * HR 管理员 / 系统管理员可在管理后台看全部。

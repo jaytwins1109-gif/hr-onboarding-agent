@@ -25,6 +25,8 @@
     "db:studio": "prisma studio",
     "db:backup": "node --import ./scripts/ts-alias-register.mjs scripts/backup-db.ts",
     "db:seed": "node --import ./scripts/ts-alias-register.mjs prisma/seed.ts",
+    "llm:e2e": "node --env-file=.env --env-file=.env.local --import ./scripts/ts-alias-register.mjs scripts/llm-config-e2e.ts",
+    "workspace:e2e": "node --env-file=.env --env-file=.env.local --import ./scripts/ts-alias-register.mjs scripts/workspace-assistant-e2e.ts",
     "security": "node scripts/security-test.mjs"
   },
   "dependencies": {

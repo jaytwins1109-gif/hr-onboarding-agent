@@ -68,25 +68,25 @@ model Department {
 /// status: queued 排队中 → parsing 解析中 → pending 待发布 / failed 失败
 ///         → published 已发布 / archived 已下架
 model PolicyDocument {
-  id             String    @id
-  name           String
-  category       String
+  id            String    @id
+  name          String
+  category      String
   /// 'all' 全员，或某个部门名
-  scope          String    @default("all")
-  version        String
+  scope         String    @default("all")
+  version       String
   /// YYYY-MM-DD；只有生效日期不晚于今天且已发布的制度才对员工可见
-  effectiveDate  String    @map("effective_date")
-  status         String    @default("queued")
-  failureReason  String?   @map("failure_reason")
-  content        String    @default("")
-  fileName       String    @map("file_name")
-  filePath       String    @map("file_path")
-  mimeType       String    @map("mime_type")
-  uploadedById   String    @map("uploaded_by_id")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-  publishedAt    DateTime? @map("published_at")
-  archivedAt     DateTime? @map("archived_at")
+  effectiveDate String    @map("effective_date")
+  status        String    @default("queued")
+  failureReason String?   @map("failure_reason")
+  content       String    @default("")
+  fileName      String    @map("file_name")
+  filePath      String    @map("file_path")
+  mimeType      String    @map("mime_type")
+  uploadedById  String    @map("uploaded_by_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  publishedAt   DateTime? @map("published_at")
+  archivedAt    DateTime? @map("archived_at")
 
   @@index([status])
   @@map("policy_documents")
@@ -176,6 +176,39 @@ model ModelConfig {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("model_configs")
+}
+
+/// 员工咨询会话（文档第 15 步）：一段对话一行，标题取第一个问题。
+/// 红线：userId 只是归属标记，所有读取都必须先按当前登录账号过滤，
+/// 即使知道别人的会话 id 也拿不到内容（见 consultations/[id]/route.ts）。
+model Consultation {
+  id        String   @id
+  userId    String   @map("user_id")
+  title     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  messages ConsultationMessage[]
+
+  @@index([userId, updatedAt])
+  @@map("consultations")
+}
+
+/// 咨询消息（文档第 15 步）：本步的 assistant 回复是固定占位话术，
+/// 后续接入检索与 AI 回答时沿用同一张表，不另做一套历史记录。
+model ConsultationMessage {
+  id             String       @id
+  consultationId String       @map("consultation_id")
+  consultation   Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  /// "user" | "assistant"
+  role           String
+  content        String
+  /// 同一会话内的顺序号：同一毫秒写入的两条消息也能稳定还原先后顺序
+  seq            Int
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@index([consultationId, seq])
+  @@map("consultation_messages")
 }
 
 /// 操作审计（文档第 14 步先落记录，页面在第 38 步做）。

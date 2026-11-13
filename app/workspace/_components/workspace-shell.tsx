@@ -15,15 +15,20 @@ import {
   ClipboardList,
   Cpu,
   FileText,
+  FlaskConical,
   KeyRound,
   LayoutDashboard,
   LogOut,
+  MessageSquare,
   Network,
+  Plus,
   Users,
 } from 'lucide-react';
 
 type ActivePage =
   | 'home'
+  | 'assistant'
+  | 'retrieval-test'
   | 'employees'
   | 'org'
   | 'policies'
@@ -40,6 +45,9 @@ interface Props {
   pageTitle?: string;
   canManage?: boolean;
   canConfigureModel?: boolean;
+  /** 「员工服务助手」页专用：最近咨询（最多 12 条）与当前会话高亮 */
+  recentConsultations?: { id: string; title: string }[];
+  activeConsultationId?: string;
   children?: ReactNode;
 }
 
@@ -52,6 +60,7 @@ const NAV: {
   devOnly?: boolean;
 }[] = [
   { key: 'home', href: '/workspace', label: '工作概览', icon: LayoutDashboard },
+  { key: 'assistant', href: '/workspace/assistant', label: '员工服务助手', icon: MessageSquare },
   { key: 'policy-center', href: '/workspace/policy-center', label: '制度中心', icon: BookOpen },
   { key: 'org', href: '/workspace/org', label: '组织架构', icon: Network },
   {
@@ -82,6 +91,13 @@ const NAV: {
     manageOnly: true,
   },
   {
+    key: 'retrieval-test',
+    href: '/workspace/retrieval-test',
+    label: '查找测试',
+    icon: FlaskConical,
+    manageOnly: true,
+  },
+  {
     key: 'model-config',
     href: '/workspace/model-config',
     label: '模型配置',
@@ -98,6 +114,8 @@ export function WorkspaceShell({
   pageTitle = '工作概览',
   canManage = false,
   canConfigureModel = false,
+  recentConsultations = [],
+  activeConsultationId = '',
   children,
 }: Props) {
   const router = useRouter();
@@ -168,6 +186,47 @@ export function WorkspaceShell({
               </Link>
             );
           })}
+
+          {active === 'assistant' && (
+            <div className="mt-4 border-t border-slate-700 pt-4">
+              <Link
+                href="/workspace/assistant"
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${
+                  !activeConsultationId
+                    ? 'bg-blue-700/30 text-white'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <Plus className="h-4 w-4" />
+                开始新咨询
+              </Link>
+              <p className="px-3 pb-1 pt-4 text-xs font-medium text-slate-400">
+                最近咨询（最多 12 条）
+              </p>
+              {recentConsultations.length === 0 ? (
+                <p className="px-3 py-2 text-xs leading-relaxed text-slate-500">
+                  还没有咨询记录，问第一句就会出现在这里。
+                </p>
+              ) : (
+                <div className="max-h-64 space-y-0.5 overflow-y-auto">
+                  {recentConsultations.map((item) => (
+                    <Link
+                      key={item.id}
+                      href={`/workspace/assistant?c=${encodeURIComponent(item.id)}`}
+                      title={item.title}
+                      className={`block truncate rounded-lg px-3 py-2 text-xs transition ${
+                        activeConsultationId === item.id
+                          ? 'bg-blue-700/30 text-white'
+                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      {item.title}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </nav>
 
         <div className="border-t border-slate-700 px-4 py-5">

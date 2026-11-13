@@ -23,10 +23,10 @@ flowchart TD
     B -->|今天星期几 / 几点| E[系统时钟直答<br/>真实时区 · 零幻觉]
     B -->|材料里的 certificate| F[业务词汇解释线]
     B -->|命中知识库| G[FAQ 确定性回答<br/>权限守卫 · 软删除过滤]
-    B -->|均未命中| H{有 API Key?}
+    B -->|均未命中| H{工作台已保存模型配置?}
 
-    H -->|无 Key| I[Mock 演示模式<br/>拟人化关键词回复 · 零网络]
-    H -->|有 Key| J[LLM 温和兜底<br/>deepseek 主 → glm 备]
+    H -->|无配置| I[Mock 演示模式<br/>拟人化关键词回复 · 零网络]
+    H -->|有配置| J[LLM 温和兜底<br/>服务端解密库里的密钥]
     I --> K[后置安全闸门]
     J --> K
     F --> K
@@ -48,8 +48,8 @@ flowchart TD
 
 | 故障场景 | 行为 |
 |---|---|
-| 没配任何 API Key | 自动进入 **[本地演示模式]**，拟人化 Mock 回复，无需配置即可体验完整交互 |
-| 主 Key 失效 / 网络失败 | 自动切换备用 provider（glm），再失败落静态兜底话术 |
+| 工作台没保存模型配置 | 自动进入 **[本地演示模式]**，拟人化 Mock 回复，无需任何密钥即可体验完整交互 |
+| 密钥解密失败 / 查库失败 / 上游超时 | 一律降级，调用方回退静态兜底话术，不阻断对话 |
 | LLM 输出越界 / 编造 | 后置闸门拦截，替换为安全话术 |
 
 任何一层失手都有下一层接住——用户永远能看到一条得体的回复。
@@ -72,13 +72,16 @@ flowchart TD
 ```bash
 npm install
 npx prisma db push        # 建表（SQLite，零外部依赖）
-npm run db:seed           # 写入 3 条种子 FAQ
 npm run dev               # http://localhost:3000
 ```
 
-> **不配 API Key 也能玩**：系统自动进入 [本地演示模式]，情绪安抚、越界拦截、时间问答全部可用。
+打开 <http://localhost:3000/workspace>：首次使用按页面提示创建工作空间与管理员账号，之后用「员工登录」进入。
+示例账号与密码见 `samples/示例账号清单.csv`（仅供本机演示）；`/workspace/assistant` 是员工服务助手。
 
-启用真实 LLM：复制 `.env.example` 为 `.env.local`，填入 `DEEPSEEK_API_KEY`（或 `GLM_API_KEY`）与 `AUTH_SECRET`。
+> **不配任何密钥也能玩**：工作台没保存模型配置时，系统自动进入 [本地演示模式]，无需配置即可体验完整交互。
+
+启用真实 LLM：在 `/workspace/model-config` 填接口地址、模型名称与密钥；密钥用 AES-256-GCM 加密存库，页面只提示「已加密保存」，绝不回显。
+`.env*` 里的 `DEEPSEEK_*` / `GLM_*` 只对 vitest 兼容用例生效，development / production 不读取。
 
 ### 管理后台
 
@@ -95,17 +98,19 @@ npm run promote-admin -- <邮箱或userId> [USER|ADMIN|DEVELOPER]   # 默认提�
 ## 回归与检查
 
 ```bash
-npm run verify   # tsc --noEmit + vitest run（119 条全绿）
-npm test         # 只跑 vitest
-npm run lint     # ESLint 9 flat config，0 error 0 warning 才收工
-npm run security # AI 安全红队测试（15 payload，需先起 dev）
+npm run verify         # tsc --noEmit + vitest run（203 条全绿）
+npm test               # 只跑 vitest
+npm run lint           # ESLint 9 flat config，0 error 0 warning 才收工
+npm run format:check   # Prettier 全绿
+npm run llm:e2e        # 模型配置真库闭环（离线）
+npm run workspace:e2e  # 助手 / 检索端到端（需先起 dev）
 ```
 
 > 改文案 / 守卫 / 知识条目后，`verify` + `lint` 全绿才算完成。
 
 ## 技术栈
 
-Next.js 15（App Router）· React 19 · Tailwind CSS 4 · Prisma + SQLite · jose（JWT）· DeepSeek / GLM（OpenAI 兼容接口）· Vitest · Playwright（E2E 探针）
+Next.js 15（App Router）· React 19 · Tailwind CSS 3 · Prisma + SQLite · jose（JWT）· OpenAI 兼容接口（工作台加密配置）· Vitest
 
 ## License
 
