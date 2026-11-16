@@ -67,7 +67,7 @@ describe('limitRecentConsultations（最多 12 条）', () => {
 });
 
 describe('PLACEHOLDER_REPLY（本步只占位，绝不编造制度结论）', () => {
-  it('明示占位与依据尚未接入', () => {
+  it('明示占位回复且不作制度依据', () => {
     expect(PLACEHOLDER_REPLY).toContain('占位回复');
     expect(PLACEHOLDER_REPLY).toContain('依据');
   });

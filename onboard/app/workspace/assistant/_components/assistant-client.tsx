@@ -1,12 +1,15 @@
 'use client';
 
-// 员工服务助手聊天界面（文档第 15 步）。
-// 本步只负责「问与记」：回复由服务端给固定占位话术，真正的制度检索与带依据回答在下一步接入。
+// 员工服务助手聊天界面（第 15 步建，第 17 步接入异步带引用回答）。
+// 发送流程：提问落库 → POST answer 触发后台任务 → 轮询 GET → 回答快照替换占位气泡。
+// 切走再回来会重新拉一次 answers，done 的历史回答照样能显示。
 
-import { useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useState, type KeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowUp, BookOpen, CalendarDays, ClipboardList, Loader2, Sparkles } from 'lucide-react';
 import { MAX_QUESTION_LENGTH } from '@/lib/workspace/consultations';
+import { safeDisplayText, type AnswerPayload } from '@/lib/workspace/answer-schema';
+import { AnswerBubble } from './answer-bubble';
 
 export interface ChatMessage {
   id: string;
@@ -25,6 +28,12 @@ export interface InitialConsultation {
 interface Props {
   name: string;
   initialConsultation: InitialConsultation | null;
+}
+
+interface AnswerRecord {
+  status: 'pending' | 'done' | 'failed';
+  payload: AnswerPayload | null;
+  error?: string;
 }
 
 const QUICK_CARDS = [
@@ -58,15 +67,113 @@ function timeLabel(iso: string): string {
   }).format(new Date(iso));
 }
 
+/** assistant 消息对应它前面最近的一条 user 消息（回答按 user 消息 id 归档） */
+function previousUserId(messages: ChatMessage[], index: number): string | null {
+  for (let i = index - 1; i >= 0; i -= 1) {
+    if (messages[i].role === 'user') return messages[i].id;
+  }
+  return null;
+}
+
+async function fetchAnswers(cid: string): Promise<Record<string, AnswerRecord>> {
+  const res = await fetch(`/api/workspace/consultations/${encodeURIComponent(cid)}/answer`);
+  if (!res.ok) return {};
+  const data = (await res.json().catch(() => null)) as {
+    answers?: {
+      messageId: string;
+      status: string;
+      payload: unknown;
+      error?: string | null;
+    }[];
+  } | null;
+  const next: Record<string, AnswerRecord> = {};
+  for (const row of data?.answers ?? []) {
+    next[row.messageId] = {
+      status: row.status === 'done' ? 'done' : row.status === 'failed' ? 'failed' : 'pending',
+      payload: row.status === 'done' && row.payload ? (row.payload as AnswerPayload) : null,
+      error: row.error ?? undefined,
+    };
+  }
+  return next;
+}
+
+function PlainBubble({ message, note }: { message: ChatMessage; note: string }) {
+  return (
+    <div className="max-w-[85%] rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-800">
+      <p className="whitespace-pre-wrap break-words">{safeDisplayText(message.content)}</p>
+      <p className="mt-2 text-[11px] text-slate-400">
+        {timeLabel(message.createdAt)} · {note}
+      </p>
+    </div>
+  );
+}
+
 export function AssistantClient({ name, initialConsultation }: Props) {
   const router = useRouter();
   const [messages, setMessages] = useState<ChatMessage[]>(initialConsultation?.messages ?? []);
   const [consultationId, setConsultationId] = useState<string | null>(
     initialConsultation?.id ?? null,
   );
+  const [answers, setAnswers] = useState<Record<string, AnswerRecord>>({});
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  const refreshAnswers = useCallback(async () => {
+    if (!consultationId) return;
+    const next = await fetchAnswers(consultationId);
+    setAnswers((prev) => ({ ...prev, ...next }));
+  }, [consultationId]);
+
+  // 恢复历史咨询：把已生成过的回答一起拉回来
+  useEffect(() => {
+    void refreshAnswers();
+  }, [refreshAnswers]);
+
+  // 还有 pending 就持续轮询；全部落定后自动停
+  const hasPending = Object.values(answers).some((item) => item.status === 'pending');
+  useEffect(() => {
+    if (!consultationId || !hasPending) return;
+    const timer = setInterval(() => void refreshAnswers(), 1500);
+    return () => clearInterval(timer);
+  }, [consultationId, hasPending, refreshAnswers]);
+
+  async function triggerAnswer(cid: string, messageId: string) {
+    setAnswers((prev) => ({ ...prev, [messageId]: { status: 'pending', payload: null } }));
+    try {
+      const res = await fetch(`/api/workspace/consultations/${encodeURIComponent(cid)}/answer`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ messageId }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        setAnswers((prev) => ({
+          ...prev,
+          [messageId]: { status: 'failed', payload: null, error: data?.error ?? '触发失败' },
+        }));
+        return;
+      }
+      const next = await fetchAnswers(cid);
+      setAnswers((prev) => ({ ...prev, ...next }));
+    } catch {
+      setAnswers((prev) => ({
+        ...prev,
+        [messageId]: { status: 'failed', payload: null, error: '连接不上服务' },
+      }));
+    }
+    // 兜底：服务端若被中断，最多转 90 秒，不一直转圈
+    setTimeout(() => {
+      setAnswers((prev) => {
+        const current = prev[messageId];
+        if (!current || current.status !== 'pending') return prev;
+        return {
+          ...prev,
+          [messageId]: { status: 'failed', payload: null, error: '生成超时，请稍后重试' },
+        };
+      });
+    }, 90_000);
+  }
 
   async function send(preset?: string) {
     const content = (preset ?? draft).trim();
@@ -92,11 +199,14 @@ export function AssistantClient({ name, initialConsultation }: Props) {
         setError(data?.error || '发送失败，请稍后再试');
         return;
       }
-      setMessages(data?.messages ?? []);
-      setConsultationId(data?.consultationId ?? null);
+      const rows = data?.messages ?? [];
+      const cid = data?.consultationId ?? null;
+      setMessages(rows);
+      setConsultationId(cid);
       setDraft('');
-      // 让服务端重取侧栏「最近咨询」，新会话立刻出现在列表里
       router.refresh();
+      const lastUser = [...rows].reverse().find((row) => row.role === 'user');
+      if (cid && lastUser) void triggerAnswer(cid, lastUser.id);
     } catch {
       setError('连接不上服务，请稍后再试');
     } finally {
@@ -175,28 +285,43 @@ export function AssistantClient({ name, initialConsultation }: Props) {
           </div>
         ) : (
           <div className="mx-auto max-w-2xl space-y-5">
-            {messages.map((message) => {
+            {messages.map((message, index) => {
               const isUser = message.role === 'user';
+              const paired = isUser ? null : previousUserId(messages, index);
+              const answer = paired ? answers[paired] : undefined;
               return (
                 <div
                   key={message.id}
                   className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                      isUser
-                        ? 'bg-blue-700 text-white'
-                        : 'border border-slate-200 bg-slate-50 text-slate-800'
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap break-words">{message.content}</p>
-                    <p
-                      className={`mt-2 text-[11px] ${isUser ? 'text-blue-100' : 'text-slate-400'}`}
-                    >
-                      {timeLabel(message.createdAt)}
-                      {!isUser && ' · 本轮为占位回复，不作为制度依据'}
-                    </p>
-                  </div>
+                  {isUser ? (
+                    <div className="max-w-[85%] rounded-2xl bg-blue-700 px-4 py-3 text-sm leading-relaxed text-white">
+                      <p className="whitespace-pre-wrap break-words">
+                        {safeDisplayText(message.content)}
+                      </p>
+                      <p className="mt-2 text-[11px] text-blue-100">
+                        {timeLabel(message.createdAt)}
+                      </p>
+                    </div>
+                  ) : answer ? (
+                    answer.status === 'pending' ? (
+                      <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        正在核对制度依据并生成回答…
+                      </div>
+                    ) : answer.status === 'failed' ? (
+                      <div className="max-w-[85%] rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        <p>回答生成失败：{safeDisplayText(answer.error ?? '未知原因')}</p>
+                        <p className="mt-1 text-[11px]">可稍后重试，或直接联系 HR 确认。</p>
+                      </div>
+                    ) : answer.payload ? (
+                      <AnswerBubble payload={answer.payload} time={timeLabel(message.createdAt)} />
+                    ) : (
+                      <PlainBubble message={message} note="占位回复，不作为制度依据" />
+                    )
+                  ) : (
+                    <PlainBubble message={message} note="占位回复，不作为制度依据" />
+                  )}
                 </div>
               );
             })}

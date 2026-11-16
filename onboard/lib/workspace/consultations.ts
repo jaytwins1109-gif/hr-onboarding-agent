@@ -10,9 +10,9 @@ export const MAX_RECENT_CONSULTATIONS = 12;
 export const MAX_QUESTION_LENGTH = 2000;
 export const TITLE_MAX_LENGTH = 28;
 
-/** 第 15 步只用固定话术占位；下一步接入检索与 AI 回答后替换。 */
+/** 第 15 步的占位话术；第 17 段起有 answer 记录时 UI 会改用回答快照渲染。 */
 export const PLACEHOLDER_REPLY =
-  '收到你的问题了。制度检索与依据核对正在接入中，这一步先给你一条占位回复；正式回答会附上制度原文依据。';
+  '收到你的问题了。制度检索与依据核对已接入，本条为占位回复，不作为制度依据。';
 
 export interface QuestionCheck {
   ok: boolean;

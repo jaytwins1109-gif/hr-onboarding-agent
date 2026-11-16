@@ -68,7 +68,7 @@ flowchart TD
 
 ### 4. Vibe Coding 开发范式
 
-本项目是 **AI 协作开发**的完整样本：产品意图由人拍板，编码、测试、审查、安全红队、文档全部由 AI Agent 与人多轮协同完成——线性提交、203 条测试全绿、0 lint 警告，每一轮都以「实测输入 → 修复 → 回归」闭环收束。欢迎用它作为 AI 工程化协作的参考实现。
+本项目是 **AI 协作开发**的完整样本：产品意图由人拍板，编码、测试、审查、安全红队、文档全部由 AI Agent 与人多轮协同完成——线性提交、230 条测试全绿、0 lint 警告，每一轮都以「实测输入 → 修复 → 回归」闭环收束。欢迎用它作为 AI 工程化协作的参考实现。
 
 ---
 
@@ -108,12 +108,13 @@ npm run promote-admin -- <邮箱或userId> [USER|ADMIN|DEVELOPER]   # 默认提�
 以下命令同样**都在 `onboard/` 目录下执行**：
 
 ```bash
-npm run verify         # tsc --noEmit + vitest run（203 条全绿）
+npm run verify         # tsc --noEmit + vitest run（230 条全绿）
 npm test               # 只跑 vitest
 npm run lint           # ESLint 9 flat config，0 error 0 warning 才收工
 npm run format:check   # Prettier 全绿
 npm run llm:e2e        # 模型配置真库闭环（离线）
 npm run workspace:e2e  # 助手 / 检索端到端（需先起 dev）
+npm run answer:e2e     # 第 17 段带引用回答（本地模拟模型，需先起 dev）
 ```
 
 > 改文案 / 守卫 / 知识条目后，`verify` + `lint` 全绿才算完成。

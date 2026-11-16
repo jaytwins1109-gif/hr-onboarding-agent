@@ -202,6 +202,10 @@
 | 11-13 21:36 | 迁移·全链回归 | 在 `onboard/` 下跑 `verify` / `npm test` / `lint` / `format:check` / `llm:e2e` | vitest 根目录变为 `D:/codebuddy/HR Assistant/onboard`；**17 文件 203/203**、lint 0/0、Prettier 全绿、模型配置真库闭环 ALL PASS | ✅ | 迁移未改任何源码内容 |
 | 11-13 21:40 | 迁移·实机 | 在 `onboard/` 下重启 dev server（pid 6128），请求 `/workspace`，跑 `workspace:e2e` | `/workspace` 200（30284 bytes）；欢迎区、占位回复落库、跨账号 404、员工 403、报销 500 元出处、部门不串台 **21/21 ALL PASS**；测试会话已清理 | ✅ | 证明规则 6/7「之前功能不被改坏、能直接打开」 |
 | 11-13 21:40 | 迁移·遗留待确认 | 开机自启快捷方式 / 测试日志脚本默认路径 | `开机自启.bat` 生成的 `.lnk` 固化旧绝对路径，需重跑重建；`scripts/capture-log.mjs` 默认 `--out docs/TEST_LOG.md`，`docs/` 留根后需显式传 `--out ../docs/TEST_LOG.md` | ⚠️ | 不影响回归与运行，仅口径；本轮未改脚本逻辑 |
+| 11-13 21:55 | 第 17 段·离线单测 | `tests/workspace-answer.test.ts`（24 条） | 无 Key 降级 insufficient + 演示提示；模型胡编 `[99]` / 编号越界 / 800 元数字幻觉 / evidence 非原文子串 / 指纹被改 全部被本地拦下；正确引用提取制度名·版本·位置·指纹·生效日期·下载链接；Prompt 防注入与 XSS 静态断言 | ✅ | `verify` 18 文件 **227/227**；`lint` 0/0；`format:check` 全绿 |
+| 11-13 21:58 | 第 17 段·端到端 | `npm run answer:e2e`（本地模拟 OpenAI 兼容服务 + 库里加密的测试 Key） | 触发 202/pending → 轮询 done；依据充分、结论含 500、角标编号来自服务端、引用快照带出处与下载链接、示例制度提示；跨账号轮询 404；删配置后降级 insufficient 且不产角标；**16/16 ALL PASS** | ✅ | 模拟服务不是外部真实模型，密钥为本地测试值；脚本自动恢复配置、删测试会话 |
+| 11-13 22:00 | 第 17 段·Edge 实机 | 员工登录 → 提问「出差住宿报销上限是多少？」→ 点 `[1]` 角标 | 「依据充分」+ 结论含 500 元 + `[1]` 角标 + 「回答依据 · 1 处引用」；展开后显示 `[1] 示例报销制度 · v1.0` / 第 4 段 · 三、具体标准 / 生效日期 / 适用范围 / 原文摘录 / 下载原始文档；耗时 128 ms；控制台 0 error 0 warning | ✅ | 全部内容以 React 文本节点渲染，无 innerHTML；测试会话与配置已清理（consultations 0 / answers 0 / modelConfigs 0） |
+| 11-13 22:20 | 第 17 段·防间接注入 | `answer-prompt.ts` 改 XML 定界符 + System Prompt 注入防护原话 | 单测覆盖：防护原话逐字存在、每段资料独立 `<retrieved_context>` 包裹且闭合标签数正确、原文里伪造的 `</retrieved_context>` 被中性化、问题里 `</user_question>` 注入不破坏结构；`answer:e2e` 模拟服务改按新标签解析后仍 ALL PASS | ✅ | `verify` 18 文件 **230/230**（新增 3 条）、`lint` 0/0、`format:check` 全绿 |
 | 11-13 20:12 | 未验 | 真实模型密钥下的 AI 带引用回答 | 本步未做：第 17 段才接入生成与核验，当前助手回复仍是固定占位 | ⚠️ | 需管理员在 `/workspace/model-config` 填真实凭据后单独排期 |
 
 ## 2. 自动归档（`scripts/capture-log.mjs` 追加）

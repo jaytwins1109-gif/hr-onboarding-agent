@@ -189,13 +189,14 @@ model Consultation {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   messages ConsultationMessage[]
+  answers  ConsultationAnswer[]
 
   @@index([userId, updatedAt])
   @@map("consultations")
 }
 
-/// 咨询消息（文档第 15 步）：本步的 assistant 回复是固定占位话术，
-/// 后续接入检索与 AI 回答时沿用同一张表，不另做一套历史记录。
+/// 咨询消息（文档第 15 步）：assistant 这条在 UI 上会被第 17 段的回答快照替换显示，
+/// 表里的占位文案保留，便于追溯「当时先给了什么」。
 model ConsultationMessage {
   id             String       @id
   consultationId String       @map("consultation_id")
@@ -209,6 +210,40 @@ model ConsultationMessage {
 
   @@index([consultationId, seq])
   @@map("consultation_messages")
+}
+
+/// 带引用回答（文档第 17 步）：一次 user 提问对应一条异步任务。
+/// 红线：引用快照整份存下来（含版本、位置、原文与指纹），不能只存 chunkId——
+/// 制度改版后同一编号的正文会变，将来要据此判断「当前切片已变化」。
+/// status: pending 生成中 → done 完成 / failed 失败；answerStatus 是回答本身的依据状态。
+model ConsultationAnswer {
+  id                String       @id
+  consultationId    String       @map("consultation_id")
+  consultation      Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  /// 关联到触发本次生成的那条 user 消息
+  messageId         String       @map("message_id")
+  /// 归属冗余一列：轮询接口不必 join 就能按本人过滤
+  userId            String       @map("user_id")
+  question          String
+  /// "pending" | "done" | "failed"
+  status            String       @default("pending")
+  /// "supported" | "partial" | "insufficient" | "conflict"（done 时有效）
+  answerStatus      String?      @map("answer_status")
+  /// AnswerPayload 的 JSON 字符串（SQLite 无 Json scalar）
+  payloadJson       String       @map("payload_json")
+  /// CitationSnapshot[] 的 JSON 字符串，单独存一份便于核对引用是否被改动
+  citationsJson     String       @map("citations_json")
+  /// 整组候选片段的指纹，用于「当前切片已变化」判断
+  sourceFingerprint String       @map("source_fingerprint")
+  model             String       @default("")
+  elapsedMs         Int          @default(0) @map("elapsed_ms")
+  error             String?
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  @@unique([consultationId, messageId])
+  @@index([userId, status])
+  @@map("consultation_answers")
 }
 
 /// 操作审计（文档第 14 步先落记录，页面在第 38 步做）。
