@@ -365,4 +365,29 @@ describe('Prompt 与 XSS 防线', () => {
     expect(source).not.toContain('dangerouslySetInnerHTML');
     expect(source).not.toContain('innerHTML');
   });
+
+  it('诊断行受 showDiagnostics 开关控制，普通员工看不到模型名与耗时', () => {
+    const source = readFileSync(
+      new URL('../app/workspace/assistant/_components/answer-bubble.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(source).toContain('showDiagnostics && (');
+    expect(source).toContain('耗时 {payload.elapsedMs} ms');
+    const page = readFileSync(
+      new URL('../app/workspace/assistant/page.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(page).toContain('canSeeAnswerDiagnostics(viewer.role)');
+  });
+
+  it('年假黄色引用行只渲染账本流水，不再硬编码自我解释', () => {
+    const source = readFileSync(
+      new URL('../app/workspace/assistant/_components/answer-bubble.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(source).toContain('payload.ledgerEntries');
+    expect(source).toContain('账本流水 · 引用依据');
+    expect(source).not.toContain('未经 AI 生成');
+    expect(source).not.toContain('不属于制度条文');
+  });
 });

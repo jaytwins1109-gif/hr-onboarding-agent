@@ -4,6 +4,7 @@
 // 只追加、不更新、不删除；没有流水的人返回 balance=null（不代表余额为零）。
 
 import { prisma } from '@/lib/db';
+import type { LedgerEntryRef } from './answer-schema';
 import { currentLeaveYear, sumDeltas, type LeaveSummary } from './leave';
 
 export type { LeaveEntry, LeaveSummary } from './leave';
@@ -37,6 +38,20 @@ export async function balanceFor(userId: string, year: number): Promise<number> 
 
 export async function hasEntries(userId: string, year: number): Promise<boolean> {
   return (await prisma.leaveLedger.count({ where: { userId, year } })) > 0;
+}
+
+/** 某人某年度的逐条流水（按时间正序），作为回答里的引用依据 */
+export async function listLeaveEntryRefs(userId: string, year: number): Promise<LedgerEntryRef[]> {
+  const rows = await prisma.leaveLedger.findMany({
+    where: { userId, year },
+    orderBy: { createdAt: 'asc' },
+    select: { delta: true, reason: true, createdAt: true },
+  });
+  return rows.map((row) => ({
+    date: formatChinaTime(row.createdAt).slice(0, 10),
+    reason: row.reason,
+    delta: row.delta,
+  }));
 }
 
 export async function appendLeaveEntry(input: {

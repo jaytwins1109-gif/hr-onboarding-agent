@@ -5,7 +5,11 @@
 
 import type { Metadata } from 'next';
 import { prisma } from '@/lib/db';
-import { canConfigureModel, canManageEmployees } from '@/lib/workspace/access';
+import {
+  canConfigureModel,
+  canManageEmployees,
+  canSeeAnswerDiagnostics,
+} from '@/lib/workspace/access';
 import { MAX_RECENT_CONSULTATIONS } from '@/lib/workspace/consultations';
 import { requireWorkspaceViewer } from '@/lib/workspace/session';
 import { WorkspaceShell } from '../_components/workspace-shell';
@@ -70,6 +74,7 @@ export default async function AssistantPage({ searchParams }: Props) {
         key={initial?.id ?? 'new'}
         name={viewer.name?.trim() || viewer.email || '同事'}
         initialConsultation={initial}
+        showDiagnostics={canSeeAnswerDiagnostics(viewer.role)}
       />
     </WorkspaceShell>
   );

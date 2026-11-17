@@ -83,6 +83,15 @@ export function canConfigureModel(role?: string | null): boolean {
 }
 
 /**
+ * 回答底部的「耗时 + 模型名」调试信息：仅管理员及以上可见（第 18 段）。
+ * 普通员工只看到结论与引用，不暴露内部用了哪个模型、耗时多少。
+ * 与模型配置的区别：HR 管理员也能看调试信息，但不能改模型配置。
+ */
+export function canSeeAnswerDiagnostics(role?: string | null): boolean {
+  return canEnterAdminConsole(role);
+}
+
+/**
  * 「查找测试」小页面（文档第 16 步第 5 条）：仅管理员可用。
  * 页面隐藏菜单只是体验，接口必须再调一次同一个函数。
  */

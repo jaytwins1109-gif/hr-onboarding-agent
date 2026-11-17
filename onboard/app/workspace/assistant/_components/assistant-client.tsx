@@ -28,6 +28,8 @@ export interface InitialConsultation {
 interface Props {
   name: string;
   initialConsultation: InitialConsultation | null;
+  /** 回答底部的耗时 / 模型名，仅管理员及以上可见（服务端算好传入） */
+  showDiagnostics: boolean;
 }
 
 interface AnswerRecord {
@@ -108,7 +110,7 @@ function PlainBubble({ message, note }: { message: ChatMessage; note: string }) 
   );
 }
 
-export function AssistantClient({ name, initialConsultation }: Props) {
+export function AssistantClient({ name, initialConsultation, showDiagnostics }: Props) {
   const router = useRouter();
   const [messages, setMessages] = useState<ChatMessage[]>(initialConsultation?.messages ?? []);
   const [consultationId, setConsultationId] = useState<string | null>(
@@ -315,7 +317,11 @@ export function AssistantClient({ name, initialConsultation }: Props) {
                         <p className="mt-1 text-[11px]">可稍后重试，或直接联系 HR 确认。</p>
                       </div>
                     ) : answer.payload ? (
-                      <AnswerBubble payload={answer.payload} time={timeLabel(message.createdAt)} />
+                      <AnswerBubble
+                        payload={answer.payload}
+                        time={timeLabel(message.createdAt)}
+                        showDiagnostics={showDiagnostics}
+                      />
                     ) : (
                       <PlainBubble message={message} note="占位回复，不作为制度依据" />
                     )

@@ -17,6 +17,8 @@ import {
 interface Props {
   payload: AnswerPayload;
   time: string;
+  /** 底部「耗时 + 模型名」调试行，仅管理员及以上可见 */
+  showDiagnostics: boolean;
 }
 
 function CitationDetail({ citation }: { citation: CitationSnapshot }) {
@@ -47,7 +49,7 @@ function CitationDetail({ citation }: { citation: CitationSnapshot }) {
   );
 }
 
-export function AnswerBubble({ payload, time }: Props) {
+export function AnswerBubble({ payload, time, showDiagnostics }: Props) {
   const [openId, setOpenId] = useState<number | null>(null);
   const byId = new Map(payload.citations.map((citation) => [citation.id, citation]));
   const used = payload.citations.filter((citation) => citation.used);
@@ -135,14 +137,30 @@ export function AnswerBubble({ payload, time }: Props) {
         </div>
       )}
 
+      {payload.ledgerEntries && payload.ledgerEntries.length > 0 && (
+        <div className="mt-3 rounded-lg bg-amber-50 px-2 py-1.5 text-[11px] leading-relaxed text-amber-800">
+          <p className="font-semibold">账本流水 · 引用依据</p>
+          <ul className="mt-1 space-y-0.5">
+            {payload.ledgerEntries.map((entry, index) => (
+              <li key={index}>
+                {safeDisplayText(entry.date)} · {safeDisplayText(entry.reason)} ·{' '}
+                {entry.delta > 0 ? '+' : ''}
+                {entry.delta} 天
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {payload.notice && (
         <p className="mt-3 rounded-lg bg-amber-50 px-2 py-1.5 text-[11px] leading-relaxed text-amber-800">
           {safeDisplayText(payload.notice)}
         </p>
       )}
-      <p className="mt-3 text-[11px] text-slate-400">
-        依据已按原文规则核对 · 耗时 {payload.elapsedMs} ms · {safeDisplayText(payload.model)}
-      </p>
+      {showDiagnostics && (
+        <p className="mt-3 text-[11px] text-slate-400">
+          依据已按原文规则核对 · 耗时 {payload.elapsedMs} ms · {safeDisplayText(payload.model)}
+        </p>
+      )}
     </div>
   );
 }

@@ -71,6 +71,13 @@ export interface AnswerConclusion {
   citationIds: number[];
 }
 
+/** 个人年假账本的一条流水引用（日期 + 事由 + 增减），作为余额的逐条依据 */
+export interface LedgerEntryRef {
+  date: string;
+  reason: string;
+  delta: number;
+}
+
 export interface AnswerPayload {
   status: AnswerStatus;
   statusLabel: string;
@@ -79,6 +86,8 @@ export interface AnswerPayload {
   missing: string[];
   conflicts: string[];
   notice: string | null;
+  /** 个人年假回答的账本流水引用；只列原始记录，不写解释话术 */
+  ledgerEntries?: LedgerEntryRef[];
   model: string;
   elapsedMs: number;
   /** 是否所有结论都通过了确定性规则核验 */

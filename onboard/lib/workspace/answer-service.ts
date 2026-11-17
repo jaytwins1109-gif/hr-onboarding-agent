@@ -20,6 +20,8 @@ import {
   type AnswerPayload,
   type PolicyMeta,
 } from './answer-schema';
+import { isPersonalLeaveQuery, personalLeaveAnswer, queryLeaveYear } from './leave-answer';
+import { balanceFor, hasEntries, listLeaveEntryRefs } from './leave-store';
 import { retrieveForQuestion, type RetrievalPolicy, type RetrievedChunk } from './retrieval';
 
 const TOP_K = 4;
@@ -83,6 +85,31 @@ async function persistDone(answerId: string, payload: AnswerPayload, chunks: Ret
 export async function generateAnswer(answerId: string, input: AnswerJobInput): Promise<void> {
   const started = Date.now();
   try {
+    // 本人年假余额属于个人数据：直读账本作答，不经模型、不查制度。
+    // userId 来自会话归属（POST 出口已校验），前端无法指定他人的记录。
+    if (isPersonalLeaveQuery(input.question)) {
+      const year = queryLeaveYear(input.question);
+      const has = await hasEntries(input.userId, year);
+      const [balance, entries] = has
+        ? await Promise.all([
+            balanceFor(input.userId, year),
+            listLeaveEntryRefs(input.userId, year),
+          ])
+        : [null, []];
+      await persistDone(
+        answerId,
+        personalLeaveAnswer({
+          question: input.question,
+          year,
+          balance,
+          entries,
+          elapsedMs: Date.now() - started,
+        }),
+        [],
+      );
+      return;
+    }
+
     let cfg = null;
     try {
       cfg = await loadLlmConfigFromDb();
